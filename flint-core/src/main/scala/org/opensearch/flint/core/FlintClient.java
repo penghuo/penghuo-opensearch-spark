@@ -8,6 +8,7 @@ package org.opensearch.flint.core;
 import org.opensearch.flint.core.metadata.FlintMetadata;
 import org.opensearch.flint.core.storage.FlintReader;
 import org.opensearch.flint.core.storage.FlintWriter;
+import org.opensearch.flint.core.storage.OpenSearchUpdater;
 
 import java.io.Writer;
 
@@ -64,4 +65,7 @@ public interface FlintClient {
    * @return {@link FlintWriter}
    */
   FlintWriter createWriter(String indexName);
+
+
+  OpenSearchUpdater createUpdater(String indexName);
 }

@@ -5,6 +5,9 @@
 
 package org.opensearch.flint.spark.skipping
 
+import java.text.SimpleDateFormat
+import java.time.Instant
+
 import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization
@@ -21,7 +24,7 @@ import org.opensearch.flint.spark.skipping.valueset.ValueSetSkippingStrategy
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.catalyst.dsl.expressions.DslExpression
 import org.apache.spark.sql.flint.datatype.FlintDataType
-import org.apache.spark.sql.functions.{col, input_file_name, sha1}
+import org.apache.spark.sql.functions.{col, input_file_name, sha1, udf}
 import org.apache.spark.sql.types.StructType
 
 /**
@@ -73,9 +76,18 @@ class FlintSparkSkippingIndex(
         new Column(aggFunc.toAggregateExpression().as(name))
       }
 
+    val latency = udf((filePath: String) => {
+      val pattern = """(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})""".r
+      val timestamp = pattern.findFirstIn(filePath).getOrElse(filePath)
+      val timestampInSeconds =
+        new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").parse(timestamp).getTime / 1000
+      Instant.now().getEpochSecond - timestampInSeconds
+    })
+
     df.groupBy(input_file_name().as(FILE_PATH_COLUMN))
       .agg(namedAggFuncs.head, namedAggFuncs.tail: _*)
       .withColumn(ID_COLUMN, sha1(col(FILE_PATH_COLUMN)))
+      .withColumn("latency", latency(col(FILE_PATH_COLUMN)))
   }
 
   private def getMetaInfo: String = {

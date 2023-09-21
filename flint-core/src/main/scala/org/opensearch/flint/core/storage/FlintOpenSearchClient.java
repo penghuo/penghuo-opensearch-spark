@@ -126,6 +126,10 @@ public class FlintOpenSearchClient implements FlintClient {
     }
   }
 
+  @Override public OpenSearchUpdater createUpdater(String indexName) {
+    return new OpenSearchUpdater(createClient(), indexName);
+  }
+
   public FlintWriter createWriter(String indexName) {
     return new OpenSearchWriter(createClient(), indexName, options.getRefreshPolicy());
   }
