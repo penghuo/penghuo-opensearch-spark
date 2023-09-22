@@ -30,11 +30,11 @@ import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructTyp
  */
 object FlintREPL extends Logging {
 
-  def execute(query: String, spark: SparkSession, resultIndex: String): Unit = {
+  def execute(query: String, spark: SparkSession, resultIndex: String, queryId: String): Unit = {
     val result: DataFrame = spark.sql(query)
 
     // Get Data
-    val data = getFormattedData(result, spark)
+    val data = getFormattedData(result, spark, queryId)
 
     // Write data to OpenSearch index
     data.write
@@ -87,7 +87,7 @@ object FlintREPL extends Logging {
         logInfo(s"""command running: ${flintCommand}""")
         update(flintCommand, flintUpdater, queryIndex)
         try {
-          execute(flintCommand.query, spark, resultIndex)
+          execute(flintCommand.query, spark, resultIndex, flintCommand.id)
           flintCommand.complete()
           logInfo(s"""command complete: ${flintCommand}""")
           update(flintCommand, flintUpdater, queryIndex)
@@ -99,7 +99,7 @@ object FlintREPL extends Logging {
         }
       }
       flintReader.close()
-      Thread.sleep(1000)
+      Thread.sleep(100)
     }
     flintUpdater.close()
   }
@@ -114,7 +114,7 @@ object FlintREPL extends Logging {
    * @return
    *   dataframe with result, schema and emr step id
    */
-  def getFormattedData(result: DataFrame, spark: SparkSession): DataFrame = {
+  def getFormattedData(result: DataFrame, spark: SparkSession, queryId: String): DataFrame = {
     // Create the schema dataframe
     val schemaRows = result.schema.fields.map { field =>
       Row(field.name, field.dataType.typeName)
@@ -139,7 +139,7 @@ object FlintREPL extends Logging {
       (
         result.toJSON.collect.toList.map(_.replaceAll("'", "\\\\'").replaceAll("\"", "'")),
         resultSchema.toJSON.collect.toList.map(_.replaceAll("\"", "'")),
-        sys.env.getOrElse("SERVERLESS_EMR_JOB_ID", "unknown"),
+        queryId,
         spark.sparkContext.applicationId))
 
     // Create the DataFrame for data
