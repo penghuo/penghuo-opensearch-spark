@@ -10,10 +10,11 @@ A Flint index is ...
 
 ### Feature Highlights
 
-- Skipping Index
+- Skipping Index: accelerate data scan by maintaining compact aggregate data structure which includes
   - Partition: skip data scan by maintaining and filtering partitioned column value per file.
   - MinMax: skip data scan by maintaining lower and upper bound of the indexed column per file.
   - ValueSet: skip data scan by building a unique value set of the indexed column per file.
+- Covering Index: create index for selected columns within the source dataset to improve query performance
 
 Please see the following example in which Index Building Logic and Query Rewrite Logic column shows the basic idea behind each skipping index implementation.
 
@@ -117,18 +118,18 @@ High level API is dependent on query engine implementation. Please see Query Eng
 
 ### SQL
 
-DDL statement:
+#### Skipping Index
 
 ```sql
-CREATE SKIPPING INDEX
+CREATE SKIPPING INDEX [IF NOT EXISTS]
 ON <object>
 ( column <index_type> [, ...] )
 WHERE <filter_predicate>
-WITH (auto_refresh = (true|false))
+WITH ( options )
 
 REFRESH SKIPPING INDEX ON <object>
 
-DESCRIBE SKIPPING INDEX ON <object>
+[DESC|DESCRIBE] SKIPPING INDEX ON <object>
 
 DROP SKIPPING INDEX ON <object>
 
@@ -155,6 +156,66 @@ REFRESH SKIPPING INDEX ON alb_logs
 DESCRIBE SKIPPING INDEX ON alb_logs
 
 DROP SKIPPING INDEX ON alb_logs
+```
+
+#### Covering Index
+
+```sql
+CREATE INDEX [IF NOT EXISTS] name ON <object>
+( column [, ...] )
+WHERE <filter_predicate>
+WITH ( options )
+
+REFRESH INDEX name ON <object>
+
+SHOW [INDEX|INDEXES] ON <object>
+
+[DESC|DESCRIBE] INDEX name ON <object>
+
+DROP INDEX name ON <object>
+```
+
+Example:
+
+```sql
+CREATE INDEX elb_and_requestUri
+ON alb_logs ( elb, requestUri )
+
+REFRESH INDEX elb_and_requestUri ON alb_logs
+
+SHOW INDEX ON alb_logs
+
+DESCRIBE INDEX elb_and_requestUri ON alb_logs
+
+DROP INDEX elb_and_requestUri ON alb_logs
+```
+
+#### Create Index Options
+
+User can provide the following options in `WITH` clause of create statement:
+
++ `auto_refresh`: triggers Incremental Refresh immediately after index create complete if true. Otherwise, user has to trigger Full Refresh by `REFRESH` statement manually.
++ `refresh_interval`: a string as the time interval for incremental refresh, e.g. 1 minute, 10 seconds. This is only applicable when auto refresh enabled. Please check `org.apache.spark.unsafe.types.CalendarInterval` for valid duration identifiers. By default, next micro batch will be generated as soon as the previous one complete processing.
++ `checkpoint_location`: a string as the location path for incremental refresh job checkpoint. The location has to be a path in an HDFS compatible file system and only applicable when auto refresh enabled. If unspecified, temporary checkpoint directory will be used and may result in checkpoint data lost upon restart.
+
+```sql
+WITH (
+  auto_refresh = [true|false],
+  refresh_interval = 'time interval expression',
+  checkpoint_location = 'checkpoint directory path'
+)
+```
+
+Example:
+
+```sql
+CREATE INDEX elb_and_requestUri
+ON alb_logs ( elb, requestUri )
+WITH (
+  auto_refresh = true,
+  refresh_interval = '1 minute',
+  checkpoint_location = 's3://test/'
+)
 ```
 
 ## Index Store
@@ -210,7 +271,9 @@ In the index mapping, the `_meta` and `properties`field stores meta and schema i
 - `spark.datasource.flint.host`: default is localhost.
 - `spark.datasource.flint.port`: default is 9200.
 - `spark.datasource.flint.scheme`: default is http. valid values [http, https]
-- `spark.datasource.flint.auth`: default is false. valid values [false, sigv4]
+- `spark.datasource.flint.auth`: default is noauth. valid values [noauth, sigv4, basic]
+- `spark.datasource.flint.auth.username`: basic auth username.
+- `spark.datasource.flint.auth.password`: basic auth password.
 - `spark.datasource.flint.region`: default is us-west-2. only been used when auth=sigv4
 - `spark.datasource.flint.customAWSCredentialsProvider`: default is empty.   
 - `spark.datasource.flint.write.id_name`: no default value.
@@ -264,6 +327,7 @@ Here is an example for Flint Spark integration:
 ```scala
 val flint = new FlintSpark(spark)
 
+// Skipping index
 flint.skippingIndex()
     .onTable("alb_logs")
     .filterBy("time > 2023-04-01 00:00:00")
@@ -273,6 +337,15 @@ flint.skippingIndex()
     .create()
 
 flint.refresh("flint_alb_logs_skipping_index", FULL)
+
+// Covering index
+flint.coveringIndex()
+    .name("elb_and_requestUri")
+    .onTable("alb_logs")
+    .addIndexColumns("elb", "requestUri")
+    .create()
+
+flint.refresh("flint_alb_logs_elb_and_requestUri_index")
 ```
 
 #### Skipping Index Provider SPI
@@ -383,4 +456,12 @@ Flint use [DefaultAWSCredentialsProviderChain](https://docs.aws.amazon.com/AWSJa
 --conf spark.datasource.flint.customAWSCredentialsProvider=com.amazonaws.emr.AssumeRoleAWSCredentialsProvider \
 --conf spark.emr-serverless.driverEnv.ASSUME_ROLE_CREDENTIALS_ROLE_ARN=arn:aws:iam::AccountB:role/CrossAccountRoleB \
 --conf spark.executorEnv.ASSUME_ROLE_CREDENTIALS_ROLE_ARN=arn:aws:iam::AccountBB:role/CrossAccountRoleB
+```
+
+### Basic Auth
+Add Basic Auth configuration in Spark configuration. Replace username and password with correct one.
+```
+--conf spark.datasource.flint.auth=basic
+--conf spark.datasource.flint.auth.username=username
+--conf spark.datasource.flint.auth.password=password
 ```

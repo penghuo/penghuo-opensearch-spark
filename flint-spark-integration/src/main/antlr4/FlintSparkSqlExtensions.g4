@@ -16,6 +16,7 @@ singleStatement
 
 statement
     : skippingIndexStatement
+    | coveringIndexStatement
     ;
 
 skippingIndexStatement
@@ -26,7 +27,8 @@ skippingIndexStatement
     ;
 
 createSkippingIndexStatement
-    : CREATE SKIPPING INDEX ON tableName=multipartIdentifier
+    : CREATE SKIPPING INDEX (IF NOT EXISTS)?
+        ON tableName=multipartIdentifier
         LEFT_PAREN indexColTypeList RIGHT_PAREN
         (WITH LEFT_PAREN propertyList RIGHT_PAREN)?
     ;
@@ -41,6 +43,37 @@ describeSkippingIndexStatement
 
 dropSkippingIndexStatement
     : DROP SKIPPING INDEX ON tableName=multipartIdentifier
+    ;
+
+coveringIndexStatement
+    : createCoveringIndexStatement
+    | refreshCoveringIndexStatement
+    | showCoveringIndexStatement
+    | describeCoveringIndexStatement
+    | dropCoveringIndexStatement
+    ;
+
+createCoveringIndexStatement
+    : CREATE INDEX (IF NOT EXISTS)? indexName=identifier
+        ON tableName=multipartIdentifier
+        LEFT_PAREN indexColumns=multipartIdentifierPropertyList RIGHT_PAREN
+        (WITH LEFT_PAREN propertyList RIGHT_PAREN)?
+    ;
+
+refreshCoveringIndexStatement
+    : REFRESH INDEX indexName=identifier ON tableName=multipartIdentifier
+    ;
+
+showCoveringIndexStatement
+    : SHOW (INDEX | INDEXES) ON tableName=multipartIdentifier
+    ;
+
+describeCoveringIndexStatement
+    : (DESC | DESCRIBE) INDEX indexName=identifier ON tableName=multipartIdentifier
+    ;
+
+dropCoveringIndexStatement
+    : DROP INDEX indexName=identifier ON tableName=multipartIdentifier
     ;
 
 indexColTypeList

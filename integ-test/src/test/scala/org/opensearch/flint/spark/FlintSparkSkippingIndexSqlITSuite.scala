@@ -7,72 +7,29 @@ package org.opensearch.flint.spark
 
 import scala.Option.empty
 
-import org.opensearch.flint.OpenSearchSuite
 import org.opensearch.flint.spark.skipping.FlintSparkSkippingIndex.getSkippingIndexName
 import org.scalatest.matchers.must.Matchers.defined
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 
-import org.apache.spark.FlintSuite
-import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.flint.FlintDataSourceV2.FLINT_DATASOURCE
-import org.apache.spark.sql.flint.config.FlintSparkConf.{HOST_ENDPOINT, HOST_PORT, REFRESH_POLICY}
-import org.apache.spark.sql.streaming.StreamTest
 
-class FlintSparkSqlITSuite
-    extends QueryTest
-    with FlintSuite
-    with OpenSearchSuite
-    with StreamTest {
-
-  /** Flint Spark high level API for assertion */
-  private lazy val flint: FlintSpark = new FlintSpark(spark)
+class FlintSparkSkippingIndexSqlITSuite extends FlintSparkSuite {
 
   /** Test table and index name */
-  private val testTable = "default.flint_sql_test"
+  private val testTable = "default.skipping_sql_test"
   private val testIndex = getSkippingIndexName(testTable)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    // Configure for FlintSpark explicit created above and the one behind Flint SQL
-    setFlintSparkConf(HOST_ENDPOINT, openSearchHost)
-    setFlintSparkConf(HOST_PORT, openSearchPort)
-    setFlintSparkConf(REFRESH_POLICY, true)
-
-    // Create test table
-    sql(s"""
-           | CREATE TABLE $testTable
-           | (
-           |   name STRING,
-           |   age INT
-           | )
-           | USING CSV
-           | OPTIONS (
-           |  header 'false',
-           |  delimiter '\t'
-           | )
-           | PARTITIONED BY (
-           |    year INT,
-           |    month INT
-           | )
-           |""".stripMargin)
-
-    sql(s"""
-           | INSERT INTO $testTable
-           | PARTITION (year=2023, month=4)
-           | VALUES ('Hello', 30)
-           | """.stripMargin)
+    createPartitionedTable(testTable)
   }
 
   protected override def afterEach(): Unit = {
     super.afterEach()
-    flint.deleteIndex(testIndex)
 
-    // Stop all streaming jobs if any
-    spark.streams.active.foreach { job =>
-      job.stop()
-      job.awaitTermination()
-    }
+    flint.deleteIndex(testIndex)
   }
 
   test("create skipping index with auto refresh") {
@@ -95,7 +52,27 @@ class FlintSparkSqlITSuite
 
     val indexData = spark.read.format(FLINT_DATASOURCE).load(testIndex)
     flint.describeIndex(testIndex) shouldBe defined
-    indexData.count() shouldBe 1
+    indexData.count() shouldBe 2
+  }
+
+  test("create skipping index with streaming job options") {
+    withTempDir { checkpointDir =>
+      sql(s"""
+             | CREATE SKIPPING INDEX ON $testTable
+             | ( year PARTITION )
+             | WITH (
+             |   auto_refresh = true,
+             |   refresh_interval = '5 Seconds',
+             |   checkpoint_location = '${checkpointDir.getAbsolutePath}'
+             | )
+             | """.stripMargin)
+
+      val index = flint.describeIndex(testIndex)
+      index shouldBe defined
+      index.get.options.autoRefresh() shouldBe true
+      index.get.options.refreshInterval() shouldBe Some("5 Seconds")
+      index.get.options.checkpointLocation() shouldBe Some(checkpointDir.getAbsolutePath)
+    }
   }
 
   test("create skipping index with manual refresh") {
@@ -114,7 +91,29 @@ class FlintSparkSqlITSuite
     indexData.count() shouldBe 0
 
     sql(s"REFRESH SKIPPING INDEX ON $testTable")
-    indexData.count() shouldBe 1
+    indexData.count() shouldBe 2
+  }
+
+  test("create skipping index if not exists") {
+    sql(s"""
+           | CREATE SKIPPING INDEX
+           | IF NOT EXISTS
+           | ON $testTable ( year PARTITION )
+           | """.stripMargin)
+    flint.describeIndex(testIndex) shouldBe defined
+
+    // Expect error without IF NOT EXISTS, otherwise success
+    assertThrows[IllegalStateException] {
+      sql(s"""
+             | CREATE SKIPPING INDEX
+             | ON $testTable ( year PARTITION )
+             | """.stripMargin)
+    }
+    sql(s"""
+           | CREATE SKIPPING INDEX
+           | IF NOT EXISTS
+           | ON $testTable ( year PARTITION )
+           | """.stripMargin)
   }
 
   test("describe skipping index") {
@@ -138,7 +137,7 @@ class FlintSparkSqlITSuite
 
   test("create skipping index on table without database name") {
     sql(s"""
-           | CREATE SKIPPING INDEX ON flint_sql_test
+           | CREATE SKIPPING INDEX ON skipping_sql_test
            | (
            |   year PARTITION,
            |   name VALUE_SET,
