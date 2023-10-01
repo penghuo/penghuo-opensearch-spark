@@ -45,6 +45,9 @@ import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.search.SearchModule;
 import org.opensearch.search.builder.SearchSourceBuilder;
+import org.opensearch.search.sort.SortBuilder;
+import org.opensearch.search.sort.SortBuilders;
+import org.opensearch.search.sort.SortOrder;
 
 /**
  * Flint client implementation for OpenSearch storage.
@@ -138,6 +141,24 @@ public class FlintOpenSearchClient implements FlintClient {
       return new OpenSearchScrollReader(createClient(),
           indexName,
           new SearchSourceBuilder().query(queryBuilder),
+          options);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override public FlintReader createReader(String indexName, String query, String sort) {
+    try {
+      QueryBuilder queryBuilder = new MatchAllQueryBuilder();
+      if (!Strings.isNullOrEmpty(query)) {
+        XContentParser
+            parser =
+            XContentType.JSON.xContent().createParser(xContentRegistry, IGNORE_DEPRECATIONS, query);
+        queryBuilder = AbstractQueryBuilder.parseInnerQueryBuilder(parser);
+      }
+      return new OpenSearchScrollReader(createClient(),
+          indexName,
+          new SearchSourceBuilder().query(queryBuilder).sort(sort, SortOrder.ASC),
           options);
     } catch (IOException e) {
       throw new RuntimeException(e);

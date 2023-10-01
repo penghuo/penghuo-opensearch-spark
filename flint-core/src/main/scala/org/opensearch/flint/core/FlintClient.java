@@ -65,6 +65,8 @@ public interface FlintClient {
    */
   FlintReader createReader(String indexName, String query);
 
+  FlintReader createReader(String indexName, String query, String sort);
+
   /**
    * Create {@link FlintWriter}.
    *

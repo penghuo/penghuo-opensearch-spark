@@ -9,17 +9,17 @@ import org.json4s.{Formats, NoTypeHints}
 import org.json4s.native.JsonMethods.parse
 import org.json4s.native.Serialization
 
-class FlintCommand(var status: String, val query: String, val id: String) {
+class FlintCommand(var state: String, val query: String, val queryId: String) {
   def running(): Unit = {
-    status = "running"
+    state = "RUNNING"
   }
 
   def complete(): Unit = {
-    status = "complete"
+    state = "SUCCESS"
   }
 
   def fail(): Unit = {
-    status = "fail"
+    state = "FAILED"
   }
 }
 
@@ -29,18 +29,18 @@ object FlintCommand {
 
   def deserialize(command: String): FlintCommand = {
     val meta = parse(command)
-    val status = (meta \ "status").extract[String]
+    val state = (meta \ "state").extract[String]
     val query = (meta \ "query").extract[String]
-    val id = (meta \ "id").extract[String]
+    val queryId = (meta \ "queryId").extract[String]
 
-    new FlintCommand(status, query, id)
+    new FlintCommand(state, query, queryId)
   }
 
   def serialize(flintCommand: FlintCommand): String = {
     Serialization.write(
       Map(
-        "status" -> flintCommand.status,
+        "state" -> flintCommand.state,
         "query" -> flintCommand.query,
-        "id" -> flintCommand.id))
+        "queryId" -> flintCommand.queryId))
   }
 }

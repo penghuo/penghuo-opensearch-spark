@@ -30,6 +30,8 @@ import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructTyp
  */
 object FlintREPL extends Logging {
 
+  val queryIndex = "datasource_repl_index"
+
   def execute(query: String, spark: SparkSession, resultIndex: String, queryId: String): Unit = {
     val result: DataFrame = spark.sql(query)
 
@@ -49,59 +51,79 @@ object FlintREPL extends Logging {
   }
 
   def update(flintCommand: FlintCommand, updater: OpenSearchUpdater, queryIndex: String): Unit = {
-    updater.update(flintCommand.id, serialize(flintCommand))
+    updater.update(flintCommand.queryId, serialize(flintCommand))
   }
 
   def main(args: Array[String]) {
-    // parse argument
-    val queryIndex = args(0)
-    val resultIndex = args(1)
+    val Array(query, resultIndex, wait, sessionId) = args;
 
     // init SparkContext
     val conf: SparkConf = new SparkConf()
       .setAppName("FlintJob")
-      .set("spark.sql.extensions", "org.opensearch.flint.spark.FlintSparkExtensions")
     val spark = SparkSession.builder().config(conf).enableHiveSupport().getOrCreate()
+    try {
+      if (wait.equalsIgnoreCase("wait")) {
+        logInfo(s"""streaming query ${query}""")
+        execute(query, spark, resultIndex, sys.env.getOrElse("SERVERLESS_EMR_JOB_ID", "unknown"))
+        spark.streams.awaitAnyTermination()
+      } else {
+        val flintClient = FlintClientBuilder.build(FlintSparkConf().flintOptions())
+        val dsl = """{
+                    |  "bool": {
+                    |    "must": [
+                    |      {
+                    |        "term": {
+                    |          "state": "PENDING"
+                    |        }
+                    |      },
+                    |      {
+                    |        "term": {
+                    |          "type": "request"
+                    |        }
+                    |      }
+                    |    ]
+                    |  }
+                    |}""".stripMargin
+        val flintUpdater = flintClient.createUpdater(queryIndex)
 
-    // init OpenSearch
-    val flintClient = FlintClientBuilder.build(FlintSparkConf().flintOptions())
+        val jobId = sys.env.getOrElse("SERVERLESS_EMR_JOB_ID", "unknown");
+        val flintJob = new FlintInstance(jobId, sessionId, "RUNNING")
+        flintUpdater.update(flintJob.sessionId, FlintInstance.serialize(flintJob))
+        logInfo(
+          s"""update job {"jobid": ${flintJob.jobId}, "sessionId": ${flintJob.sessionId}} from ${queryIndex}""".stripMargin)
 
-    val dsl = """{
-                |  "term": {
-                |    "status": {
-                |      "value": "pending"
-                |    }
-                |  }
-                |}""".stripMargin
-    val flintUpdater = flintClient.createUpdater(queryIndex)
-
-    while (true) {
-      logInfo(s"""read from ${queryIndex}""")
-      val flintReader = flintClient.createReader(queryIndex, dsl)
-      while (flintReader.hasNext) {
-        val command = flintReader.next()
-        logInfo(s"""raw command: ${command}""")
-        val flintCommand = FlintCommand.deserialize(command)
-        logInfo(s"""command: ${flintCommand}""")
-        flintCommand.running()
-        logInfo(s"""command running: ${flintCommand}""")
-        update(flintCommand, flintUpdater, queryIndex)
-        try {
-          execute(flintCommand.query, spark, resultIndex, flintCommand.id)
-          flintCommand.complete()
-          logInfo(s"""command complete: ${flintCommand}""")
-          update(flintCommand, flintUpdater, queryIndex)
-        } catch {
-          case e: Exception =>
-            flintCommand.fail()
-            logInfo(s"""command fail: ${flintCommand}""")
+        while (true) {
+          logInfo(s"""read from ${queryIndex}""")
+          val flintReader = flintClient.createReader(queryIndex, dsl, "submitTime")
+          while (flintReader.hasNext) {
+            val command = flintReader.next()
+            logInfo(s"""raw command: ${command}""")
+            val flintCommand = FlintCommand.deserialize(command)
+            logInfo(s"""command: ${flintCommand}""")
+            flintCommand.running()
+            logInfo(s"""command running: ${flintCommand}""")
             update(flintCommand, flintUpdater, queryIndex)
+            try {
+              execute(flintCommand.query, spark, resultIndex, flintCommand.queryId)
+              flintCommand.complete()
+              logInfo(s"""command complete: ${flintCommand}""")
+              update(flintCommand, flintUpdater, queryIndex)
+            } catch {
+              case e: Exception =>
+                flintCommand.fail()
+                logInfo(s"""command fail: ${flintCommand}""")
+                update(flintCommand, flintUpdater, queryIndex)
+            }
+          }
+          flintReader.close()
+          Thread.sleep(100)
         }
+        flintUpdater.close()
       }
-      flintReader.close()
-      Thread.sleep(100)
+    } finally {
+      spark.stop()
     }
-    flintUpdater.close()
+
   }
 
   /**
