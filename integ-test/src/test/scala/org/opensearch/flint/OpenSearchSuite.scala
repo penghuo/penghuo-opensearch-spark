@@ -6,6 +6,9 @@
 package org.opensearch.flint
 
 import org.apache.http.HttpHost
+import org.apache.http.auth.{AuthScope, UsernamePasswordCredentials}
+import org.apache.http.impl.client.BasicCredentialsProvider
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.index.IndexRequest
@@ -16,7 +19,7 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.testcontainers.OpenSearchContainer
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-import org.apache.spark.sql.flint.config.FlintSparkConf.{HOST_ENDPOINT, HOST_PORT, IGNORE_DOC_ID_COLUMN, REFRESH_POLICY}
+import org.apache.spark.sql.flint.config.FlintSparkConf._
 
 /**
  * Test required OpenSearch domain should extend OpenSearchSuite.
@@ -26,27 +29,38 @@ trait OpenSearchSuite extends BeforeAndAfterAll {
 
   protected lazy val container = new OpenSearchContainer()
 
-  protected lazy val openSearchPort: Int = container.port()
+//  protected lazy val openSearchPort: Int = container.port()
+//
+//  protected lazy val openSearchHost: String = container.getHost
 
-  protected lazy val openSearchHost: String = container.getHost
+  val username = ""
 
-  protected lazy val openSearchClient = new RestHighLevelClient(
-    RestClient.builder(new HttpHost(openSearchHost, openSearchPort, "http")))
+  val password = ""
+
+  protected lazy val openSearchPort: Int = -1
+
+  protected lazy val openSearchHost: String =
+//    "search-es710-q2zaewxlq6emjr77rgnulqraoy.aos.us-west-2.on.aws"
+    "search-test211-q3zk5fk47yjotz5hwslguy4s5i.aos.us-west-2.on.aws"
+
+  protected lazy val openSearchClient = createClient
 
   protected lazy val openSearchOptions =
     Map(
-      s"${HOST_ENDPOINT.optionKey}" -> openSearchHost,
+      s"${HOST_ENDPOINT.optionKey}" -> s"$openSearchHost",
       s"${HOST_PORT.optionKey}" -> s"$openSearchPort",
-      s"${REFRESH_POLICY.optionKey}" -> "wait_for",
-      s"${IGNORE_DOC_ID_COLUMN.optionKey}" -> "false")
+      s"${SCHEME.optionKey}" -> "https",
+      s"${AUTH.optionKey}" -> "basic",
+      s"${USERNAME.optionKey}" -> s"$username",
+      s"${PASSWORD.optionKey}" -> s"$password")
 
   override def beforeAll(): Unit = {
-    container.start()
+//    container.start()
     super.beforeAll()
   }
 
   override def afterAll(): Unit = {
-    container.close()
+//    container.close()
     super.afterAll()
   }
 
@@ -67,7 +81,7 @@ trait OpenSearchSuite extends BeforeAndAfterAll {
 
   val oneNodeSetting = """{
                          |  "number_of_shards": "1",
-                         |  "number_of_replicas": "0"
+                         |  "number_of_replicas": "1"
                          |}""".stripMargin
 
   def simpleIndex(indexName: String): Unit = {
@@ -132,5 +146,17 @@ trait OpenSearchSuite extends BeforeAndAfterAll {
         !response.hasFailures,
         s"bulk index docs to $index failed: ${response.buildFailureMessage()}")
     }
+  }
+
+  def createClient: RestHighLevelClient = {
+    val restClientBuilder =
+      RestClient.builder(new HttpHost(openSearchHost, openSearchPort, "https"))
+    val credentialsProvider = new BasicCredentialsProvider
+    credentialsProvider.setCredentials(
+      AuthScope.ANY,
+      new UsernamePasswordCredentials("admin", "Welcome@123"))
+    restClientBuilder.setHttpClientConfigCallback((httpClientBuilder: HttpAsyncClientBuilder) =>
+      httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider))
+    new RestHighLevelClient(restClientBuilder)
   }
 }

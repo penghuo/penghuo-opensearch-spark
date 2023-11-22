@@ -22,12 +22,15 @@ import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.logging.Logger;
 
 /**
  * OpenSearch Bulk writer. More reading https://opensearch.org/docs/1.2/opensearch/rest-api/document-apis/bulk/.
  * It is not thread safe.
  */
 public class OpenSearchWriter extends FlintWriter {
+
+  private static final Logger LOG = Logger.getLogger(OpenSearchWriter.class.getName());
 
   private final String indexName;
 
@@ -65,6 +68,7 @@ public class OpenSearchWriter extends FlintWriter {
         if (response.hasFailures() && Arrays.stream(response.getItems()).anyMatch(itemResp -> !isCreateConflict(itemResp))) {
           throw new RuntimeException(response.buildFailureMessage());
         }
+        LOG.info("bulk response " + response.status().toString());
       }
     } catch (IOException e) {
       throw new RuntimeException(String.format("Failed to execute bulk request on index: %s", indexName), e);
