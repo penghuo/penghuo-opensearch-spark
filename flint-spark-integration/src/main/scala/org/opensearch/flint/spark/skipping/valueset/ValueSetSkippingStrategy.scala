@@ -44,7 +44,7 @@ case class ValueSetSkippingStrategy(
     Seq(aggregator.expr)
   }
 
-  override def rewritePredicate(predicate: Expression): Option[Expression] =
+  override def rewritePredicate(predicate: Expression): Option[Expression] = {
     /*
      * This is supposed to be rewritten to ARRAY_CONTAINS(columName, value).
      * However, due to push down limitation in Spark, we keep the equation.
@@ -52,9 +52,10 @@ case class ValueSetSkippingStrategy(
     predicate match {
       case EqualTo(AttributeReference(`columnName`, _, _, _), value: Literal) =>
         // Value set maybe null due to maximum size limit restriction
-        Some((isnull(col(columnName)) || col(columnName) === value).expr)
+        Some((isnull(col(columnName)) || array_contains(col(columnName), value)).expr)
       case _ => None
     }
+  }
 }
 
 object ValueSetSkippingStrategy {

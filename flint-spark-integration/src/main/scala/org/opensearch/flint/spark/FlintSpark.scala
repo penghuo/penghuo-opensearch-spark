@@ -21,7 +21,6 @@ import org.opensearch.flint.spark.skipping.FlintSparkSkippingStrategy.SkippingKi
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.SaveMode._
 import org.apache.spark.sql.flint.FlintDataSourceV2.FLINT_DATASOURCE
 import org.apache.spark.sql.flint.config.FlintSparkConf
 import org.apache.spark.sql.flint.config.FlintSparkConf.{CHECKPOINT_MANDATORY, DOC_ID_COLUMN_NAME, IGNORE_DOC_ID_COLUMN}
@@ -31,6 +30,8 @@ import org.apache.spark.sql.streaming.{DataStreamWriter, Trigger}
  * Flint Spark integration API entrypoint.
  */
 class FlintSpark(val spark: SparkSession) extends Logging {
+
+  private val parquetPath = "s3://flint-data-dp-us-west-2-beta/data/skippingindex/"
 
   /** Flint spark configuration */
   private val flintSparkConf: FlintSparkConf =
@@ -316,7 +317,7 @@ class FlintSpark(val spark: SparkSession) extends Logging {
    *   index query data frame
    */
   def queryIndex(indexName: String): DataFrame = {
-    spark.read.format(FLINT_DATASOURCE).load(indexName)
+    spark.read.parquet(parquetPath)
   }
 
   // TODO: move to separate class
@@ -333,10 +334,8 @@ class FlintSpark(val spark: SparkSession) extends Logging {
       index
         .build(spark, df)
         .write
-        .format(FLINT_DATASOURCE)
-        .options(flintSparkConf.properties)
-        .mode(Overwrite)
-        .save(indexName)
+        .mode("overwrite")
+        .parquet(parquetPath)
     }
 
     val jobId = mode match {
