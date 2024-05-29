@@ -12,7 +12,9 @@ import java.util.Locale
 import scala.util.{Failure, Success, Try}
 
 import org.opensearch.action.get.{GetRequest, GetResponse}
+import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.{SearchRequest, SearchResponse}
+import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.client.{RequestOptions, RestHighLevelClient}
 import org.opensearch.client.indices.{CreateIndexRequest, GetIndexRequest, GetIndexResponse}
 import org.opensearch.client.indices.CreateIndexRequest
@@ -33,6 +35,12 @@ import org.apache.spark.internal.Logging
 
 class OSClient(val flintOptions: FlintOptions) extends Logging {
   val flintClient: FlintClient = FlintClientBuilder.build(flintOptions)
+
+  var spark: SparkSession = null;
+
+  def setSpark(sparkSession: SparkSession): Unit = {
+    spark = sparkSession
+  }
 
   /**
    * {@link NamedXContentRegistry} from {@link SearchModule} used for construct {@link
@@ -186,5 +194,27 @@ class OSClient(val flintOptions: FlintOptions) extends Logging {
   } catch {
     case e: IOException =>
       throw new RuntimeException(e)
+  }
+
+  def writeDoc(osIndexName: String, doc: String): Unit = {
+    logInfo(s"write doc $osIndexName")
+
+    using(flintClient.createClient()) { client =>
+      try {
+        val indexRequest = new IndexRequest()
+          .index(osIndexName)
+          .setRefreshPolicy(RefreshPolicy.WAIT_UNTIL)
+          .source(doc, XContentType.JSON)
+        client.index(indexRequest, RequestOptions.DEFAULT)
+
+        logInfo(s"write $osIndexName successfully")
+      } catch {
+        case e: Exception =>
+          IRestHighLevelClient.recordOperationFailure(
+            MetricConstants.RESULT_METADATA_WRITE_METRIC_PREFIX,
+            e)
+          throw new IllegalStateException(s"Failed to write $osIndexName", e);
+      }
+    }
   }
 }

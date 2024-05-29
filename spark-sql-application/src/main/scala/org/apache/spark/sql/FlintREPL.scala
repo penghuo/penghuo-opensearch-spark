@@ -118,6 +118,7 @@ object FlintREPL extends Logging with FlintJobExecutor {
 
       val spark = createSparkSession(conf)
       val osClient = new OSClient(FlintSparkConf().flintOptions())
+      osClient.setSpark(spark)
       val jobId = envinromentProvider.getEnvVar("SERVERLESS_EMR_JOB_ID", "unknown")
       val applicationId =
         envinromentProvider.getEnvVar("SERVERLESS_EMR_VIRTUAL_CLUSTER_ID", "unknown")

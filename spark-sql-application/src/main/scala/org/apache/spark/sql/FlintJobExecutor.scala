@@ -5,7 +5,10 @@
 
 package org.apache.spark.sql
 
+import java.io.CharArrayWriter
 import java.util.Locale
+
+import scala.collection.JavaConverters._
 
 import com.amazonaws.services.glue.model.{AccessDeniedException, AWSGlueException}
 import com.amazonaws.services.s3.model.AmazonS3Exception
@@ -20,6 +23,8 @@ import play.api.libs.json._
 
 import org.apache.spark.{SparkConf, SparkException}
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.json.{JacksonGenerator, JSONOptions}
 import org.apache.spark.sql.catalyst.parser.ParseException
 import org.apache.spark.sql.flint.config.FlintSparkConf
 import org.apache.spark.sql.flint.config.FlintSparkConf.REFRESH_POLICY
@@ -118,13 +123,27 @@ trait FlintJobExecutor {
     builder.getOrCreate()
   }
 
-  private def writeData(resultData: DataFrame, resultIndex: String): Unit = {
+  private def writeData(resultData: DataFrame, resultIndex: String, osClient: OSClient): Unit = {
     try {
-      resultData.write
-        .format("flint")
-        .option(REFRESH_POLICY.optionKey, "wait_for")
-        .mode("append")
-        .save(resultIndex)
+      def rowToJson(row: Row, schema: StructType, timeZone: String): String = {
+        val writer = new CharArrayWriter()
+        val gen =
+          new JacksonGenerator(
+            schema,
+            writer,
+            new JSONOptions(Map.empty[String, String], timeZone))
+        val toRow = ExpressionEncoder(schema).resolveAndBind().createSerializer()
+
+        gen.write(toRow(row))
+        gen.flush()
+        gen.close()
+        writer.toString
+      }
+
+      val docRow = resultData.collect().toList.head
+      val docToWrite =
+        rowToJson(docRow, docRow.schema, osClient.spark.sessionState.conf.sessionLocalTimeZone)
+      osClient.writeDoc(resultIndex, docToWrite)
       IRestHighLevelClient.recordOperationSuccess(
         MetricConstants.RESULT_METADATA_WRITE_METRIC_PREFIX)
     } catch {
@@ -150,10 +169,10 @@ trait FlintJobExecutor {
       resultIndex: String,
       osClient: OSClient): Unit = {
     if (osClient.doesIndexExist(resultIndex)) {
-      writeData(resultData, resultIndex)
+      writeData(resultData, resultIndex, osClient)
     } else {
       createResultIndex(osClient, resultIndex, resultIndexMapping)
-      writeData(resultData, resultIndex)
+      writeData(resultData, resultIndex, osClient)
     }
   }
 
@@ -178,11 +197,15 @@ trait FlintJobExecutor {
       timeProvider: TimeProvider,
       cleaner: Cleaner): DataFrame = {
     // Create the schema dataframe
-    val schemaRows = result.schema.fields.map { field =>
-      Row(field.name, field.dataType.typeName)
-    }
+    val schemaRows = result.schema.fields
+      .map { field =>
+        Row(field.name, field.dataType.typeName)
+      }
+      .toList
+      .asJava
+
     val resultSchema = spark.createDataFrame(
-      spark.sparkContext.parallelize(schemaRows),
+      schemaRows,
       StructType(
         Seq(
           StructField("column_name", StringType, nullable = false),
@@ -206,10 +229,34 @@ trait FlintJobExecutor {
         StructField("updateTime", LongType, nullable = false),
         StructField("queryRunTime", LongType, nullable = true)))
 
-    val resultToSave = result.toJSON.collect.toList
-      .map(_.replaceAll("'", "\\\\'").replaceAll("\"", "'"))
+    def rowToJson(row: Row, schema: StructType, timeZone: String): String = {
+      val writer = new CharArrayWriter()
+      val gen =
+        new JacksonGenerator(schema, writer, new JSONOptions(Map.empty[String, String], timeZone))
+      val toRow = ExpressionEncoder(schema).resolveAndBind().createSerializer()
 
-    val resultSchemaToSave = resultSchema.toJSON.collect.toList.map(_.replaceAll("\"", "'"))
+      gen.write(toRow(row))
+      gen.flush()
+      gen.close()
+      writer.toString
+    }
+
+    val resultToSave: List[String] = result
+      .collect()
+      .toList
+      .map(row => rowToJson(row, row.schema, spark.sessionState.conf.sessionLocalTimeZone))
+      .map { jsonString =>
+        jsonString.replaceAll("'", "\\\\'").replaceAll("\"", "'")
+      }
+
+    val resultSchemaToSave = resultSchema
+      .collect()
+      .toList
+      .map(row => rowToJson(row, row.schema, spark.sessionState.conf.sessionLocalTimeZone))
+      .map { jsonString =>
+        jsonString.replaceAll("\"", "'")
+      }
+
     val endTime = timeProvider.currentEpochMillis()
 
     // https://github.com/opensearch-project/opensearch-spark/issues/302. Clean shuffle data
