@@ -6,6 +6,8 @@
 package org.opensearch.flint.core;
 
 import org.opensearch.OpenSearchException;
+import org.opensearch.action.DocWriteResponse;
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.delete.DeleteRequest;
@@ -16,18 +18,20 @@ import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.ClearScrollRequest;
 import org.opensearch.action.search.ClearScrollResponse;
+import org.opensearch.action.search.CreatePitRequest;
+import org.opensearch.action.search.CreatePitResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchScrollRequest;
 import org.opensearch.action.update.UpdateRequest;
-import org.opensearch.action.DocWriteResponse;
+import org.opensearch.client.RequestOptions;
 import org.opensearch.client.indices.CreateIndexRequest;
 import org.opensearch.client.indices.CreateIndexResponse;
 import org.opensearch.client.indices.GetIndexRequest;
 import org.opensearch.client.indices.GetIndexResponse;
 import org.opensearch.client.indices.PutMappingRequest;
-import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
-import org.opensearch.client.RequestOptions;
+import org.opensearch.client.opensearch.indices.IndicesStatsRequest;
+import org.opensearch.client.opensearch.indices.IndicesStatsResponse;
 import org.opensearch.flint.core.logging.CustomLogging;
 import org.opensearch.flint.core.logging.OperationMessage;
 import org.opensearch.flint.core.metrics.MetricsUtil;
@@ -67,6 +71,9 @@ public interface IRestHighLevelClient extends Closeable {
 
     DocWriteResponse update(UpdateRequest updateRequest, RequestOptions options) throws IOException;
 
+    IndicesStatsResponse stats(IndicesStatsRequest request) throws IOException;
+
+    CreatePitResponse createPit(CreatePitRequest request, RequestOptions options) throws IOException;
 
     /**
      * Records the success of an OpenSearch operation by incrementing the corresponding metric counter.

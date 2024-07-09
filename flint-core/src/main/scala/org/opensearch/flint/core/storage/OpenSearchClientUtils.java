@@ -15,6 +15,7 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.opensearch.client.OpenSearchClient;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
 import org.opensearch.client.RestHighLevelClient;
@@ -52,6 +53,7 @@ public class OpenSearchClientUtils {
 
     final RequestConfigurator callback = new RequestConfigurator(options);
     restClientBuilder.setRequestConfigCallback(callback);
+
 
     return new RestHighLevelClientWrapper(new RestHighLevelClient(restClientBuilder));
   }

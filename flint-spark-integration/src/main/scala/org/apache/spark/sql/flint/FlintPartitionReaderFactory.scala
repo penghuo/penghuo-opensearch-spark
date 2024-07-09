@@ -6,6 +6,7 @@
 package org.apache.spark.sql.flint
 
 import org.opensearch.flint.core.FlintClientBuilder
+import org.opensearch.flint.core.FlintReaderBuilder.{FlintNoOpReaderBuilder, FlintPITReaderBuilder}
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.expressions.filter.Predicate
@@ -20,12 +21,19 @@ case class FlintPartitionReaderFactory(
     pushedPredicates: Array[Predicate])
     extends PartitionReaderFactory {
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
+    val query = FlintQueryCompiler(schema).compile(pushedPredicates)
+    val flintClient = FlintClientBuilder.build(options.flintOptions())
     partition match {
-      case OpenSearchSplit(shardInfo) =>
-        val query = FlintQueryCompiler(schema).compile(pushedPredicates)
-        val flintClient = FlintClientBuilder.build(options.flintOptions())
+      case OpenSearchSplit(indexName, pit, None) =>
         new FlintPartitionReader(
-          flintClient.createReader(shardInfo.indexName, query, shardInfo.id.toString),
+          flintClient.createReader(indexName, query, new FlintNoOpReaderBuilder()),
+          schema,
+          options)
+      case OpenSearchSplit(indexName, pit, Some(sliceInfo)) =>
+        val readerBuilder =
+          new FlintPITReaderBuilder(pit, sliceInfo.pageSize)
+        new FlintPartitionReader(
+          flintClient.createReader(indexName, query, readerBuilder),
           schema,
           options)
     }

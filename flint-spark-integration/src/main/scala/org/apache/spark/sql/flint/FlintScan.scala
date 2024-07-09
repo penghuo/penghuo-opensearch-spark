@@ -5,7 +5,10 @@
 
 package org.apache.spark.sql.flint
 
-import org.apache.spark.opensearch.table.{OpenSearchTable, ShardInfo}
+import org.opensearch.flint.core.FlintClientBuilder
+
+import org.apache.spark.internal.Logging
+import org.apache.spark.opensearch.table.{OpenSearchTable, SliceInfo}
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReaderFactory, Scan}
 import org.apache.spark.sql.flint.config.FlintSparkConf
@@ -17,12 +20,25 @@ case class FlintScan(
     options: FlintSparkConf,
     pushedPredicates: Array[Predicate])
     extends Scan
-    with Batch {
+    with Batch
+    with Logging {
 
   override def readSchema(): StructType = schema
 
   override def planInputPartitions(): Array[InputPartition] = {
-    table.partitions.flatMap(p => p.shards.map(s => OpenSearchSplit(s))).toArray
+    table.partitions
+      .flatMap(p => {
+        if (p.sliceInfo.isEmpty) {
+          logInfo(s"no slice")
+          Seq(OpenSearchSplit(p.partitionName, p.pit, None))
+        } else {
+          p.sliceInfo.map(s => {
+            logInfo(s"sliceInfo:$s")
+            OpenSearchSplit(p.partitionName, p.pit, Some(s))
+          })
+        }
+      })
+      .toArray
   }
 
   override def createReaderFactory(): PartitionReaderFactory = {
@@ -47,4 +63,8 @@ case class FlintScan(
  * @param shardInfo
  *   shardInfo
  */
-private[spark] case class OpenSearchSplit(shardInfo: ShardInfo) extends InputPartition {}
+private[spark] case class OpenSearchSplit(
+    indexName: String,
+    pit: String,
+    sliceInfo: Option[SliceInfo])
+    extends InputPartition {}

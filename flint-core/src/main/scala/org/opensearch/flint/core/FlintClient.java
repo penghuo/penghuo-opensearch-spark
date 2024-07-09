@@ -10,6 +10,7 @@ import java.util.Map;
 import org.opensearch.flint.core.metadata.FlintMetadata;
 import org.opensearch.flint.core.storage.FlintReader;
 import org.opensearch.flint.core.storage.FlintWriter;
+import org.opensearch.flint.core.storage.stats.IndexStatsInfo;
 
 /**
  * Flint index client that provides API for metadata and data operations
@@ -82,7 +83,7 @@ public interface FlintClient {
    * @param query DSL query. DSL query is null means match_all
    * @return {@link FlintReader}.
    */
-  FlintReader createReader(String indexName, String shardId, String query);
+  FlintReader createReader(String indexName, String query, FlintReaderBuilder builder);
 
   /**
    * Create {@link FlintWriter}.
@@ -97,4 +98,8 @@ public interface FlintClient {
    * @return {@link IRestHighLevelClient}
    */
   IRestHighLevelClient createClient();
+
+  Map<String, IndexStatsInfo> getIndexStats(String... indexNamePattern);
+
+  String createPit(String indexName);
 }

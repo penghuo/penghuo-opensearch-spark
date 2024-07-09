@@ -9,6 +9,7 @@ import scala.collection.JavaConverters._
 
 import org.opensearch.flint.core.{FlintClientBuilder, FlintOptions}
 import org.opensearch.flint.core.metadata.FlintMetadata
+import org.opensearch.flint.core.storage.stats.IndexStatsInfo
 
 import org.apache.spark.sql.flint.datatype.FlintDataType
 import org.apache.spark.sql.types.StructType
@@ -21,7 +22,11 @@ import org.apache.spark.sql.types.StructType
  * @param metadata
  *   Metadata of the table.
  */
-case class OpenSearchTable(tableName: String, metadata: Map[String, FlintMetadata]) {
+case class OpenSearchTable(
+    tableName: String,
+    metadata: Map[String, FlintMetadata],
+    stats: Map[String, IndexStatsInfo],
+    options: FlintOptions) {
   /*
    * FIXME. we use first index schema in multiple indices. we should merge StructType to widen type
    */
@@ -33,7 +38,11 @@ case class OpenSearchTable(tableName: String, metadata: Map[String, FlintMetadat
 
   lazy val partitions: Array[PartitionInfo] = {
     metadata.map { case (partitionName, metadata) =>
-      PartitionInfo.apply(partitionName, metadata.indexSettings.get)
+      PartitionInfo.apply(
+        partitionName,
+        metadata.indexSettings.get,
+        stats.get(partitionName).get,
+        options)
     }.toArray
   }
 }
@@ -51,12 +60,12 @@ object OpenSearchTable {
    *   An instance of OpenSearchTable.
    */
   def apply(tableName: String, options: FlintOptions): OpenSearchTable = {
+    val client = FlintClientBuilder
+      .build(options)
     OpenSearchTable(
       tableName,
-      FlintClientBuilder
-        .build(options)
-        .getAllIndexMetadata(tableName.split(","): _*)
-        .asScala
-        .toMap)
+      client.getAllIndexMetadata(tableName.split(","): _*).asScala.toMap,
+      client.getIndexStats(tableName.split(","): _*).asScala.toMap,
+      options)
   }
 }
