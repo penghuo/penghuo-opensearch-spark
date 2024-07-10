@@ -30,11 +30,11 @@ case class FlintScan(
       .flatMap(p => {
         if (p.sliceInfo.isEmpty) {
           logInfo(s"no slice")
-          Seq(OpenSearchSplit(p.partitionName, p.pit, None))
+          Seq(OpenSearchSplit(p.partitionName, None))
         } else {
           p.sliceInfo.map(s => {
             logInfo(s"sliceInfo:$s")
-            OpenSearchSplit(p.partitionName, p.pit, Some(s))
+            OpenSearchSplit(p.partitionName, Some(s))
           })
         }
       })
@@ -63,8 +63,5 @@ case class FlintScan(
  * @param shardInfo
  *   shardInfo
  */
-private[spark] case class OpenSearchSplit(
-    indexName: String,
-    pit: String,
-    sliceInfo: Option[SliceInfo])
+private[spark] case class OpenSearchSplit(indexName: String, sliceInfo: Option[SliceInfo])
     extends InputPartition {}

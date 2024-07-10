@@ -12,16 +12,16 @@ import org.opensearch.flint.core.IRestHighLevelClient;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class OpenSearchPITSearchAfterQueryReader extends OpenSearchReader {
 
-  private static final Logger LOG = Logger.getLogger(OpenSearchQueryReader.class.getName());
+  private static final Logger LOG = Logger.getLogger(OpenSearchPITSearchAfterQueryReader.class.getName());
 
-  private int sliceId;
-
-  private Object search_after = null;
+  private Object[] search_after = null;
 
   public OpenSearchPITSearchAfterQueryReader(IRestHighLevelClient client, String indexName, SearchSourceBuilder searchSourceBuilder) {
     super(client, new SearchRequest().source(searchSourceBuilder));
@@ -31,12 +31,13 @@ public class OpenSearchPITSearchAfterQueryReader extends OpenSearchReader {
    * search.
    */
   Optional<SearchResponse> search(SearchRequest request) {
-    Optional<SearchResponse> response = Optional.empty();
     try {
+      Optional<SearchResponse> response;
       if (search_after != null) {
+        LOG.info("add search_after " + Arrays.stream(search_after).map(Object::toString).collect(
+            Collectors.joining(",")));
         SearchSourceBuilder source = request.source();
-        source.searchAfter(new Object[] {search_after});
-        LOG.info("add search_after" + search_after);
+        source.searchAfter(search_after);
       }
       LOG.info("START Request " + request.getDescription());
       response = Optional.of(client.search(request, RequestOptions.DEFAULT));
@@ -47,11 +48,14 @@ public class OpenSearchPITSearchAfterQueryReader extends OpenSearchReader {
         return Optional.empty();
       }
       // get search_after key
-      search_after = response.get().getHits().getAt(length - 1).getId();
-      LOG.info("get search_after " + search_after);
+      search_after = response.get().getHits().getAt(length - 1).getSortValues();
+      LOG.info("get search_after " + Arrays.stream(search_after).map(Object::toString).collect(
+          Collectors.joining(",")));
+      return response;
     } catch (Exception e) {
+      LOG.warning(e.getMessage());
+      throw new RuntimeException(e);
     }
-    return response;
   }
 
   /**

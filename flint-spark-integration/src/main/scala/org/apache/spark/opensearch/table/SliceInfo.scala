@@ -5,4 +5,4 @@
 
 package org.apache.spark.opensearch.table
 
-case class SliceInfo(sliceId: Int, maxSlice: Int, pageSize: Int)
+case class SliceInfo(sliceId: Int, maxSlice: Int, pageSize: Int, pit: String)

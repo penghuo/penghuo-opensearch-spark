@@ -22,7 +22,7 @@ import org.apache.spark.internal.Logging
  * @param shards
  *   shards.
  */
-case class PartitionInfo(partitionName: String, pit: String, sliceInfo: Array[SliceInfo]) {}
+case class PartitionInfo(partitionName: String, sliceInfo: Array[SliceInfo]) {}
 
 object PartitionInfo extends Logging {
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
@@ -73,6 +73,24 @@ object PartitionInfo extends Logging {
 //  }
 
   // PIT with search_after
+//  def apply(
+//      partitionName: String,
+//      settings: String,
+//      stats: IndexStatsInfo,
+//      options: FlintOptions): PartitionInfo = {
+//    val totalSizeBytes = stats.sizeInBytes
+//    val docSize = Math.ceil(totalSizeBytes / stats.docCount).toLong
+//    val maxSplitSizeBytes = 10 * 1024 * 1024
+//    val maxResult = maxResultWindow(settings)
+//    val pageSize = Math.min(maxSplitSizeBytes / docSize, maxResult).toInt
+//
+//    val pit = FlintClientBuilder.build(options).createPit(partitionName)
+//    logInfo(s"docSize: $docSize, pageSize: $pageSize")
+//    logInfo(s"index $partitionName create pit:$pit")
+//    PartitionInfo(partitionName, pit, Array(SliceInfo(-1, -1, pageSize)))
+//  }
+
+  // PIT with search_after slice
   def apply(
       partitionName: String,
       settings: String,
@@ -87,7 +105,10 @@ object PartitionInfo extends Logging {
     val pit = FlintClientBuilder.build(options).createPit(partitionName)
     logInfo(s"docSize: $docSize, pageSize: $pageSize")
     logInfo(s"index $partitionName create pit:$pit")
-    PartitionInfo(partitionName, pit, Array(SliceInfo(-1, -1, pageSize)))
+
+    val max = numberOfShards(settings)
+    val shards = Range.apply(0, max).map(id => SliceInfo(id, max, pageSize, pit)).toArray
+    PartitionInfo(partitionName, shards)
   }
 
   /**

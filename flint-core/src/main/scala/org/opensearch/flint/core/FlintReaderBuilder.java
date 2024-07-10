@@ -13,7 +13,7 @@ import org.opensearch.search.slice.SliceBuilder;
 public interface FlintReaderBuilder {
   SearchSourceBuilder enrich(SearchSourceBuilder searchSourceBuilder);
 
-  class FlintSliceReaderBuilder implements FlintReaderBuilder {
+  class FlintPITSliceReaderBuilder implements FlintReaderBuilder {
     private final int sliceId;
 
     private final int maxSlice;
@@ -22,7 +22,7 @@ public interface FlintReaderBuilder {
 
     private final int scrollSize;
 
-    public FlintSliceReaderBuilder(int sliceId, int maxSlice, String pit, int scrollSize) {
+    public FlintPITSliceReaderBuilder(int sliceId, int maxSlice, String pit, int scrollSize) {
       this.sliceId = sliceId;
       this.maxSlice = maxSlice;
       this.pit = pit;

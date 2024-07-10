@@ -233,7 +233,9 @@ public class FlintOpenSearchClient implements FlintClient {
       }
       return new OpenSearchPITSearchAfterQueryReader(createClient(),
           sanitizeIndexName(indexName),
-          builder.enrich(new SearchSourceBuilder().query(queryBuilder).sort("_id", SortOrder.ASC)));
+          builder.enrich(new SearchSourceBuilder().query(queryBuilder)
+                  .sort("_doc", SortOrder.ASC).sort("_id", SortOrder.ASC)
+          ));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
