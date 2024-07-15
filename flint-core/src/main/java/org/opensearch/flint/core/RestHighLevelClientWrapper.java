@@ -16,16 +16,12 @@ import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.ClearScrollRequest;
 import org.opensearch.action.search.ClearScrollResponse;
-import org.opensearch.action.search.CreatePitRequest;
-import org.opensearch.action.search.CreatePitResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchScrollRequest;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
-import org.opensearch.client.Request;
 import org.opensearch.client.RequestOptions;
-import org.opensearch.client.Response;
 import org.opensearch.client.RestHighLevelClient;
 import org.opensearch.client.indices.CreateIndexRequest;
 import org.opensearch.client.indices.CreateIndexResponse;
@@ -34,13 +30,16 @@ import org.opensearch.client.indices.GetIndexResponse;
 import org.opensearch.client.indices.PutMappingRequest;
 import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch.core.pit.CreatePitResponse;
+import org.opensearch.client.opensearch.core.pit.CreatePitRequest;
 import org.opensearch.client.opensearch.indices.IndicesStatsRequest;
 import org.opensearch.client.opensearch.indices.IndicesStatsResponse;
 import org.opensearch.client.transport.rest_client.RestClientTransport;
 
 import java.io.IOException;
 
-import static org.opensearch.flint.core.metrics.MetricConstants.*;
+import static org.opensearch.flint.core.metrics.MetricConstants.OS_READ_OP_METRIC_PREFIX;
+import static org.opensearch.flint.core.metrics.MetricConstants.OS_WRITE_OP_METRIC_PREFIX;
 
 /**
  * A wrapper class for RestHighLevelClient to facilitate OpenSearch operations
@@ -134,9 +133,20 @@ public class RestHighLevelClientWrapper implements IRestHighLevelClient {
             });
     }
 
+//    @Override
+//    public CreatePitResponse createPit(CreatePitRequest request, RequestOptions options) throws IOException {
+//        return execute(OS_READ_OP_METRIC_PREFIX, () -> client.createPit(request, options));
+//    }
+
     @Override
-    public CreatePitResponse createPit(CreatePitRequest request, RequestOptions options) throws IOException {
-        return execute(OS_READ_OP_METRIC_PREFIX, () -> client.createPit(request, options));
+    public CreatePitResponse createPit(CreatePitRequest request) throws IOException {
+        return execute(OS_WRITE_OP_METRIC_PREFIX,
+            () -> {
+                OpenSearchClient openSearchClient =
+                    new OpenSearchClient(new RestClientTransport(client.getLowLevelClient(),
+                        new JacksonJsonpMapper()));
+                return openSearchClient.createPit(request);
+            });
     }
 
     /**

@@ -55,7 +55,7 @@ public class ResourceBasedAWSRequestSigningApacheInterceptor implements HttpRequ
         AWS4Signer signer = new AWS4Signer();
         signer.setServiceName(service);
         signer.setRegionName(region);
-        this.primaryInterceptor = new AWSRequestSigningApacheInterceptor(service, signer, primaryCredentialsProvider);
+        this.primaryInterceptor = new AWSRequestSigV4ASigningApacheInterceptor(service, region, AwsCrtV4aSigner.builder().build(), primaryCredentialsProvider);
         this.metadataAccessInterceptor = primaryCredentialsProvider.equals(metadataAccessCredentialsProvider)
                 ? this.primaryInterceptor
                 : new AWSRequestSigV4ASigningApacheInterceptor(service, region, AwsCrtV4aSigner.builder().build(), metadataAccessCredentialsProvider);

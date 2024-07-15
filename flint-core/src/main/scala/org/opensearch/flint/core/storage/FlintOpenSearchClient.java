@@ -5,39 +5,19 @@
 
 package org.opensearch.flint.core.storage;
 
-import static org.opensearch.common.xcontent.DeprecationHandler.IGNORE_DEPRECATIONS;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
-
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
-import org.opensearch.action.admin.indices.get.GetIndexAction;
-import org.opensearch.action.search.CreatePitRequest;
-import org.opensearch.action.search.CreatePitResponse;
-import org.opensearch.client.Request;
 import org.opensearch.client.RequestOptions;
-import org.opensearch.client.Response;
 import org.opensearch.client.indices.CreateIndexRequest;
 import org.opensearch.client.indices.GetIndexRequest;
 import org.opensearch.client.indices.GetIndexResponse;
 import org.opensearch.client.indices.PutMappingRequest;
+import org.opensearch.client.opensearch._types.Time;
 import org.opensearch.client.opensearch.indices.IndicesStatsRequest;
 import org.opensearch.client.opensearch.indices.IndicesStatsResponse;
 import org.opensearch.client.opensearch.indices.stats.IndicesStats;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.common.Strings;
 import org.opensearch.common.settings.Settings;
-import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.common.xcontent.XContentType;
@@ -54,6 +34,22 @@ import org.opensearch.search.SearchModule;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
 import scala.Option;
+import org.opensearch.client.opensearch.core.pit.CreatePitResponse;
+import org.opensearch.client.opensearch.core.pit.CreatePitRequest;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import static org.opensearch.common.xcontent.DeprecationHandler.IGNORE_DEPRECATIONS;
 
 /**
  * Flint client implementation for OpenSearch storage.
@@ -241,12 +237,17 @@ public class FlintOpenSearchClient implements FlintClient {
     }
   }
 
-  @Override public String createPit(String indexName) {
-    String osIndexName = sanitizeIndexName(indexName);
+  @Override public String createPit(IndexPartitionInfo indexName) {
+    String osIndexName = sanitizeIndexName(indexName.index());
     try (IRestHighLevelClient client = createClient()) {
-      CreatePitRequest request = new CreatePitRequest(TimeValue.timeValueMinutes(5), true, indexName);
-      CreatePitResponse response = client.createPit(request, RequestOptions.DEFAULT);
-      return response.getId();
+      CreatePitRequest
+          request =
+          new CreatePitRequest.Builder().targetIndexes(indexName.index())
+              .keepAlive(new Time.Builder().time("5m").build())
+              .preference("_shards:" + indexName.shard().get())
+              .build();
+      CreatePitResponse response = client.createPit(request);
+      return response.pitId();
     } catch (Exception e) {
       throw new IllegalStateException("Failed to delete Flint index " + osIndexName, e);
     }

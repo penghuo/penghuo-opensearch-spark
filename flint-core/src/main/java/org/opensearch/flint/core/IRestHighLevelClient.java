@@ -18,8 +18,6 @@ import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.ClearScrollRequest;
 import org.opensearch.action.search.ClearScrollResponse;
-import org.opensearch.action.search.CreatePitRequest;
-import org.opensearch.action.search.CreatePitResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchScrollRequest;
@@ -30,6 +28,8 @@ import org.opensearch.client.indices.CreateIndexResponse;
 import org.opensearch.client.indices.GetIndexRequest;
 import org.opensearch.client.indices.GetIndexResponse;
 import org.opensearch.client.indices.PutMappingRequest;
+import org.opensearch.client.opensearch.core.pit.CreatePitRequest;
+import org.opensearch.client.opensearch.core.pit.CreatePitResponse;
 import org.opensearch.client.opensearch.indices.IndicesStatsRequest;
 import org.opensearch.client.opensearch.indices.IndicesStatsResponse;
 import org.opensearch.flint.core.logging.CustomLogging;
@@ -73,7 +73,7 @@ public interface IRestHighLevelClient extends Closeable {
 
     IndicesStatsResponse stats(IndicesStatsRequest request) throws IOException;
 
-    CreatePitResponse createPit(CreatePitRequest request, RequestOptions options) throws IOException;
+    CreatePitResponse createPit(CreatePitRequest request) throws IOException;
 
     /**
      * Records the success of an OpenSearch operation by incrementing the corresponding metric counter.

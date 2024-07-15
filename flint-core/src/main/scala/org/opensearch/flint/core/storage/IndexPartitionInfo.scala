@@ -5,4 +5,4 @@
 
 package org.opensearch.flint.core.storage
 
-case class IndexPartitionInfo (index: String, shard: Option[String])
+case class IndexPartitionInfo(index: String, shard: Option[String])

@@ -7,7 +7,6 @@ package org.opensearch.flint.core.auth;
 
 import com.amazonaws.auth.AWSSessionCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.services.glue.model.InvalidStateException;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
@@ -106,7 +105,7 @@ public class AWSRequestSigV4ASigningApacheInterceptor implements HttpRequestInte
 
         HttpHost host = (HttpHost) context.getAttribute(HTTP_TARGET_HOST);
         if (host == null) {
-            throw new InvalidStateException("Host must not be null");
+            throw new IllegalStateException("Host must not be null");
         }
         builder.host(host.getHostName());
         try {

@@ -8,6 +8,7 @@ package org.apache.spark.sql.flint
 import org.opensearch.flint.core.FlintClientBuilder
 import org.opensearch.flint.core.FlintReaderBuilder.{FlintNoOpReaderBuilder, FlintPITReaderBuilder, FlintPITSliceReaderBuilder}
 
+import org.apache.spark.opensearch.table.SliceInfo
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader, PartitionReaderFactory}
@@ -29,6 +30,13 @@ case class FlintPartitionReaderFactory(
           flintClient.createReader(indexName, query, new FlintNoOpReaderBuilder()),
           schema,
           options)
+      case OpenSearchSplit(indexName, Some(SliceInfo(_, -1, pageSize, pit))) =>
+        val readerBuilder =
+          new FlintPITReaderBuilder(pit, pageSize)
+        new FlintPartitionReader(
+          flintClient.createReader(indexName, query, readerBuilder),
+          schema,
+          options)
       case OpenSearchSplit(indexName, Some(sliceInfo)) =>
         val readerBuilder =
           new FlintPITSliceReaderBuilder(
@@ -40,6 +48,7 @@ case class FlintPartitionReaderFactory(
           flintClient.createReader(indexName, query, readerBuilder),
           schema,
           options)
+
     }
   }
 }

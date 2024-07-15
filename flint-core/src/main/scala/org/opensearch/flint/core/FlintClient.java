@@ -10,6 +10,7 @@ import java.util.Map;
 import org.opensearch.flint.core.metadata.FlintMetadata;
 import org.opensearch.flint.core.storage.FlintReader;
 import org.opensearch.flint.core.storage.FlintWriter;
+import org.opensearch.flint.core.storage.IndexPartitionInfo;
 import org.opensearch.flint.core.storage.stats.IndexStatsInfo;
 
 /**
@@ -101,5 +102,5 @@ public interface FlintClient {
 
   Map<String, IndexStatsInfo> getIndexStats(String... indexNamePattern);
 
-  String createPit(String indexName);
+  String createPit(IndexPartitionInfo indexName);
 }

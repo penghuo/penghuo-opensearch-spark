@@ -14,10 +14,13 @@ import com.amazonaws.http.HttpMethodName;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.Logger;
+
 import org.apache.http.Header;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
@@ -36,6 +39,8 @@ import org.apache.http.protocol.HttpContext;
  * and {@link AWSCredentialsProvider}.
  */
 public class AWSRequestSigningApacheInterceptor implements HttpRequestInterceptor {
+  private static final Logger LOG = Logger.getLogger(AWSRequestSigningApacheInterceptor.class.getName());
+
   /**
    * The service that we're connecting to. Technically not necessary.
    * Could be used by a future Signer, though.
@@ -105,6 +110,12 @@ public class AWSRequestSigningApacheInterceptor implements HttpRequestIntercepto
     signableRequest.setParameters(nvpToMapParams(uriBuilder.getQueryParams()));
     signableRequest.setHeaders(headerArrayToMap(request.getAllHeaders()));
 
+    LOG.info("SignableRequest Endpoint: " + signableRequest.getEndpoint());
+    LOG.info("SignableRequest ResourcePath: " + signableRequest.getResourcePath());
+    LOG.info("SignableRequest HttpMethod: " + signableRequest.getHttpMethod());
+    LOG.info("SignableRequest Parameters: " + signableRequest.getParameters());
+    LOG.info("SignableRequest Headers: " + signableRequest.getHeaders());
+
     // Sign it
     signer.sign(signableRequest, awsCredentialsProvider.getCredentials());
 
@@ -129,10 +140,11 @@ public class AWSRequestSigningApacheInterceptor implements HttpRequestIntercepto
   static Map<String, List<String>> nvpToMapParams(final List<NameValuePair> params) {
     Map<String, List<String>> parameterMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     for (NameValuePair nvp : params) {
-      List<String> argsList =
-          parameterMap.computeIfAbsent(nvp.getName(), k -> new ArrayList<>());
-      argsList.add(nvp.getValue());
-    }
+        LOG.info("name: " + nvp.getName() + " value: " + nvp.getValue());
+        List<String> argsList =
+            parameterMap.computeIfAbsent(nvp.getName(), k -> new ArrayList<>());
+        argsList.add(nvp.getValue());
+      }
     return parameterMap;
   }
 
@@ -143,6 +155,7 @@ public class AWSRequestSigningApacheInterceptor implements HttpRequestIntercepto
   private static Map<String, String> headerArrayToMap(final Header[] headers) {
     Map<String, String> headersMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     for (Header header : headers) {
+      LOG.info("name: " + header.getName() + " value: " + header.getValue());
       if (!skipHeader(header)) {
         headersMap.put(header.getName(), header.getValue());
       }

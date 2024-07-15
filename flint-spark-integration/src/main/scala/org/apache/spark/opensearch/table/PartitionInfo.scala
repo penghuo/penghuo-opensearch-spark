@@ -9,6 +9,7 @@ import org.json4s.{Formats, NoTypeHints}
 import org.json4s.jackson.JsonMethods
 import org.json4s.native.Serialization
 import org.opensearch.flint.core.{FlintClientBuilder, FlintOptions}
+import org.opensearch.flint.core.storage.IndexPartitionInfo
 import org.opensearch.flint.core.storage.stats.IndexStatsInfo
 
 import org.apache.spark.internal.Logging
@@ -91,6 +92,27 @@ object PartitionInfo extends Logging {
 //  }
 
   // PIT with search_after slice
+//  def apply(
+//      partitionName: String,
+//      settings: String,
+//      stats: IndexStatsInfo,
+//      options: FlintOptions): PartitionInfo = {
+//    val totalSizeBytes = stats.sizeInBytes
+//    val docSize = Math.ceil(totalSizeBytes / stats.docCount).toLong
+//    val maxSplitSizeBytes = 10 * 1024 * 1024
+//    val maxResult = maxResultWindow(settings)
+//    val pageSize = Math.min(maxSplitSizeBytes / docSize, maxResult).toInt
+//
+//    val pit = FlintClientBuilder.build(options).createPit(partitionName)
+//    logInfo(s"docSize: $docSize, pageSize: $pageSize")
+//    logInfo(s"index $partitionName create pit:$pit")
+//
+//    val max = numberOfShards(settings)
+//    val shards = Range.apply(0, max).map(id => SliceInfo(id, max, pageSize, pit)).toArray
+//    PartitionInfo(partitionName, shards)
+//  }
+
+  // PIT with search_after shards
   def apply(
       partitionName: String,
       settings: String,
@@ -102,12 +124,20 @@ object PartitionInfo extends Logging {
     val maxResult = maxResultWindow(settings)
     val pageSize = Math.min(maxSplitSizeBytes / docSize, maxResult).toInt
 
-    val pit = FlintClientBuilder.build(options).createPit(partitionName)
     logInfo(s"docSize: $docSize, pageSize: $pageSize")
-    logInfo(s"index $partitionName create pit:$pit")
 
-    val max = numberOfShards(settings)
-    val shards = Range.apply(0, max).map(id => SliceInfo(id, max, pageSize, pit)).toArray
+    val shardsNo = numberOfShards(settings)
+    val shards = Range
+      .apply(0, shardsNo)
+      .map(id => {
+        val pit = FlintClientBuilder
+          .build(options)
+          .createPit(IndexPartitionInfo(partitionName, Some(id.toString)))
+        logInfo(s"index $partitionName create pit:$pit")
+        SliceInfo(id, -1, pageSize, pit)
+      })
+      .toArray
+
     PartitionInfo(partitionName, shards)
   }
 
