@@ -25,29 +25,29 @@ case class FlintPartitionReaderFactory(
     val query = FlintQueryCompiler(schema).compile(pushedPredicates)
     val flintClient = FlintClientBuilder.build(options.flintOptions())
     partition match {
-      case OpenSearchSplit(indexName, None) =>
-        new FlintPartitionReader(
-          flintClient.createReader(indexName, query, new FlintNoOpReaderBuilder()),
-          schema,
-          options)
-      case OpenSearchSplit(indexName, Some(SliceInfo(_, -1, pageSize, pit))) =>
+//      case OpenSearchSplit(indexName, None) =>
+//        new FlintPartitionReader(
+//          flintClient.createReader(indexName, query, new FlintNoOpReaderBuilder()),
+//          schema,
+//          options)
+      case OpenSearchSplit(indexName, Some(SliceInfo(shardId, beginId, iter, pageSize, pit))) =>
         val readerBuilder =
           new FlintPITReaderBuilder(pit, pageSize)
         new FlintPartitionReader(
-          flintClient.createReader(indexName, query, readerBuilder),
+          flintClient.createReader(indexName, query, readerBuilder, beginId, iter),
           schema,
           options)
-      case OpenSearchSplit(indexName, Some(sliceInfo)) =>
-        val readerBuilder =
-          new FlintPITSliceReaderBuilder(
-            sliceInfo.sliceId,
-            sliceInfo.maxSlice,
-            sliceInfo.pit,
-            sliceInfo.pageSize)
-        new FlintPartitionReader(
-          flintClient.createReader(indexName, query, readerBuilder),
-          schema,
-          options)
+//      case OpenSearchSplit(indexName, Some(sliceInfo)) =>
+//        val readerBuilder =
+//          new FlintPITSliceReaderBuilder(
+//            sliceInfo.sliceId,
+//            sliceInfo.maxSlice,
+//            sliceInfo.pit,
+//            sliceInfo.pageSize)
+//        new FlintPartitionReader(
+//          flintClient.createReader(indexName, query, readerBuilder),
+//          schema,
+//          options)
 
     }
   }

@@ -84,7 +84,8 @@ public interface FlintClient {
    * @param query DSL query. DSL query is null means match_all
    * @return {@link FlintReader}.
    */
-  FlintReader createReader(String indexName, String query, FlintReaderBuilder builder);
+  FlintReader createReader(String indexName, String query, FlintReaderBuilder builder,
+      int beginId, int iteration);
 
   /**
    * Create {@link FlintWriter}.

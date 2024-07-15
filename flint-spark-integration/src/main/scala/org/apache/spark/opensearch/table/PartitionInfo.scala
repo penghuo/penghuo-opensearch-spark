@@ -113,6 +113,35 @@ object PartitionInfo extends Logging {
 //  }
 
   // PIT with search_after shards
+//  def apply(
+//      partitionName: String,
+//      settings: String,
+//      stats: IndexStatsInfo,
+//      options: FlintOptions): PartitionInfo = {
+//    val totalSizeBytes = stats.sizeInBytes
+//    val docSize = Math.ceil(totalSizeBytes / stats.docCount).toLong
+//    val maxSplitSizeBytes = 10 * 1024 * 1024
+//    val maxResult = maxResultWindow(settings)
+//    val pageSize = Math.min(maxSplitSizeBytes / docSize, maxResult).toInt
+//
+//    logInfo(s"docSize: $docSize, pageSize: $pageSize")
+//
+//    val shardsNo = numberOfShards(settings)
+//    val shards = Range
+//      .apply(0, shardsNo)
+//      .map(id => {
+//        val pit = FlintClientBuilder
+//          .build(options)
+//          .createPit(IndexPartitionInfo(partitionName, Some(id.toString)))
+//        logInfo(s"index $partitionName create pit:$pit")
+//        SliceInfo(id, -1, pageSize, pit)
+//      })
+//      .toArray
+//
+//    PartitionInfo(partitionName, shards)
+//  }
+
+  // PIT with search_after shards split
   def apply(
       partitionName: String,
       settings: String,
@@ -127,18 +156,34 @@ object PartitionInfo extends Logging {
     logInfo(s"docSize: $docSize, pageSize: $pageSize")
 
     val shardsNo = numberOfShards(settings)
+    val perShardDocCount = Math.ceil(stats.docCount / shardsNo).toInt
+    val splits = 2
+    val tuples = splitDocs(perShardDocCount, pageSize, splits)
     val shards = Range
       .apply(0, shardsNo)
-      .map(id => {
+      .flatMap(id => {
         val pit = FlintClientBuilder
           .build(options)
           .createPit(IndexPartitionInfo(partitionName, Some(id.toString)))
         logInfo(s"index $partitionName create pit:$pit")
-        SliceInfo(id, -1, pageSize, pit)
+        tuples.map(t => SliceInfo(id, t._1, t._2, pageSize, pit))
       })
       .toArray
 
     PartitionInfo(partitionName, shards)
+  }
+
+  def splitDocs(numDocs: Int, pageSize: Int, splitCount: Int): Seq[(Int, Int)] = {
+    val iteration = numDocs / (pageSize * splitCount)
+    val splitSize = pageSize * (iteration)
+    val remainder = numDocs % (pageSize * splitCount)
+
+    val splits = for (i <- 0 until splitCount) yield {
+      val startId = i * splitSize
+      val iter = if (remainder == 0) iteration else iteration + 1
+      (startId, iter)
+    }
+    splits
   }
 
   /**

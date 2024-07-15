@@ -23,8 +23,14 @@ public class OpenSearchPITSearchAfterQueryReader extends OpenSearchReader {
 
   private Object[] search_after = null;
 
-  public OpenSearchPITSearchAfterQueryReader(IRestHighLevelClient client, String indexName, SearchSourceBuilder searchSourceBuilder) {
+  private int maxIteration = 0;
+
+  private int currentIteration = 0;
+
+  public OpenSearchPITSearchAfterQueryReader(IRestHighLevelClient client, String indexName,
+      SearchSourceBuilder searchSourceBuilder, int maxIteration) {
     super(client, new SearchRequest().source(searchSourceBuilder));
+    this.maxIteration = maxIteration + 1;
   }
 
   /**
@@ -32,6 +38,10 @@ public class OpenSearchPITSearchAfterQueryReader extends OpenSearchReader {
    */
   Optional<SearchResponse> search(SearchRequest request) {
     try {
+      LOG.info("iteration = " + currentIteration + " maxIteration = " + maxIteration);
+      if (currentIteration == maxIteration) {
+        return Optional.empty();
+      }
       Optional<SearchResponse> response;
       if (search_after != null) {
         LOG.info("add search_after " + Arrays.stream(search_after).map(Object::toString).collect(
@@ -40,6 +50,7 @@ public class OpenSearchPITSearchAfterQueryReader extends OpenSearchReader {
         source.searchAfter(search_after);
       }
       LOG.info("START Request " + request.getDescription());
+      currentIteration++;
       response = Optional.of(client.search(request, RequestOptions.DEFAULT));
       int length = response.get().getHits().getHits().length;
       LOG.info( "DONE length " + length);

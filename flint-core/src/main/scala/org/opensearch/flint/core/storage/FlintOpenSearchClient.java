@@ -207,7 +207,8 @@ public class FlintOpenSearchClient implements FlintClient {
    * @return {@link FlintReader}.
    */
   @Override public FlintReader createReader(String indexName, String query) {
-    return createReader(indexName, query, new FlintReaderBuilder.FlintNoOpReaderBuilder());
+    return createReader(indexName, query, new FlintReaderBuilder.FlintNoOpReaderBuilder(), 0,
+        Integer.MAX_VALUE);
   }
 
   /**
@@ -217,7 +218,8 @@ public class FlintOpenSearchClient implements FlintClient {
    * @param query DSL query. DSL query is null means match_all
    * @return
    */
-  @Override public FlintReader createReader(String indexName, String query, FlintReaderBuilder builder) {
+  @Override public FlintReader createReader(String indexName, String query,
+      FlintReaderBuilder builder, int beginId, int iteration) {
     LOG.info("Creating Flint index reader for " + indexName + " with query " + query);
     try {
       QueryBuilder queryBuilder = new MatchAllQueryBuilder();
@@ -230,8 +232,8 @@ public class FlintOpenSearchClient implements FlintClient {
       return new OpenSearchPITSearchAfterQueryReader(createClient(),
           sanitizeIndexName(indexName),
           builder.enrich(new SearchSourceBuilder().query(queryBuilder)
-                  .sort("_doc", SortOrder.ASC).sort("_id", SortOrder.ASC)
-          ));
+                  .searchAfter(new Object[]{beginId})
+                  .sort("_doc", SortOrder.ASC)), iteration);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
