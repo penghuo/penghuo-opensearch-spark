@@ -4,7 +4,7 @@
  */
 import Dependencies._
 
-lazy val scala212 = "2.12.14"
+lazy val scala212 = "2.12.18"
 lazy val sparkVersion = "3.5.1"
 // Spark jackson version. Spark jackson-module-scala strictly check the jackson-databind version should compatible
 // https://github.com/FasterXML/jackson-module-scala/blob/2.18/src/main/scala/com/fasterxml/jackson/module/scala/JacksonModule.scala#L59
@@ -12,8 +12,9 @@ lazy val jacksonVersion = "2.15.2"
 
 // The transitive opensearch jackson-databind dependency version should align with Spark jackson databind dependency version.
 // Issue: https://github.com/opensearch-project/opensearch-spark/issues/442
-lazy val opensearchVersion = "2.6.0"
+lazy val opensearchVersion = "2.15.0"
 lazy val icebergVersion = "1.5.0"
+lazy val versionsAws = "2.25.23"
 
 val scalaMinorVersion = scala212.split("\\.").take(2).mkString(".")
 val sparkMinorVersion = sparkVersion.split("\\.").take(2).mkString(".")
@@ -42,8 +43,6 @@ lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
 // Run as part of test task.
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
 
-
-
 lazy val commonSettings = Seq(
   javacOptions ++= Seq("-source", "11"),
   Compile / compile / javacOptions ++= Seq("-target", "11"),
@@ -55,12 +54,19 @@ lazy val commonSettings = Seq(
   Test / test := ((Test / test) dependsOn testScalastyle).value,
   dependencyOverrides ++= Seq(
     "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
-    "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
-  ))
+    "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion))
+
+unmanagedJars in Compile += file("lib/repository-s3-2.11.2-SNAPSHOT.jar")
 
 // running `scalafmtAll` includes all subprojects under root
 lazy val root = (project in file("."))
-  .aggregate(flintCommons, flintCore, flintSparkIntegration, pplSparkIntegration, sparkSqlApplication, integtest)
+  .aggregate(
+    flintCommons,
+    flintCore,
+    flintSparkIntegration,
+    pplSparkIntegration,
+    sparkSqlApplication,
+    integtest)
   .disablePlugins(AssemblyPlugin)
   .settings(name := "flint", publish / skip := true)
 
@@ -75,17 +81,43 @@ lazy val flintCore = (project in file("flint-core"))
       "org.opensearch.client" % "opensearch-rest-client" % opensearchVersion,
       "org.opensearch.client" % "opensearch-rest-high-level-client" % opensearchVersion
         exclude ("org.apache.logging.log4j", "log4j-api"),
-      "org.opensearch.client" % "opensearch-java" % opensearchVersion
-        // error: Scala module 2.13.4 requires Jackson Databind version >= 2.13.0 and < 2.14.0 -
-        // Found jackson-databind version 2.14.
+      "org.opensearch.client" % "opensearch-java" % "2.11.0"
+      // error: Scala module 2.13.4 requires Jackson Databind version >= 2.13.0 and < 2.14.0 -
+      // Found jackson-databind version 2.14.
         exclude ("com.fasterxml.jackson.core", "jackson-databind")
         exclude ("com.fasterxml.jackson.core", "jackson-core")
         exclude ("org.apache.httpcomponents.client5", "httpclient5"),
+      "org.opensearch" % "opensearch-x-content" % opensearchVersion,
+      "org.opensearch" % "opensearch-common" % opensearchVersion,
+      "org.opensearch" % "opensearch-core" % opensearchVersion,
+      "org.opensearch" % "opensearch" % opensearchVersion,
+      "software.amazon.awssdk" % "sdk-core" % versionsAws,
+      "software.amazon.awssdk" % "annotations" % versionsAws,
+      "software.amazon.awssdk" % "aws-core" % versionsAws,
+      "software.amazon.awssdk" % "auth" % versionsAws,
+      "software.amazon.awssdk" % "endpoints-spi" % versionsAws,
+      "software.amazon.awssdk" % "http-client-spi" % versionsAws,
+      "software.amazon.awssdk" % "apache-client" % versionsAws,
+      "software.amazon.awssdk" % "metrics-spi" % versionsAws,
+      "software.amazon.awssdk" % "profiles" % versionsAws,
+      "software.amazon.awssdk" % "regions" % versionsAws,
+      "software.amazon.awssdk" % "utils" % versionsAws,
+      "software.amazon.awssdk" % "aws-json-protocol" % versionsAws,
+      "software.amazon.awssdk" % "protocol-core" % versionsAws,
+      "software.amazon.awssdk" % "json-utils" % versionsAws,
+      "software.amazon.awssdk" % "third-party-jackson-core" % versionsAws,
+      "software.amazon.awssdk" % "s3" % versionsAws,
+      "software.amazon.awssdk" % "signer" % versionsAws,
+      "software.amazon.awssdk" % "aws-xml-protocol" % versionsAws,
+      "software.amazon.awssdk" % "aws-query-protocol" % versionsAws,
+      "software.amazon.awssdk" % "sts" % versionsAws,
+      "software.amazon.awssdk" % "netty-nio-client" % versionsAws,
+      "org.json" % "json" % "20210307",
       "dev.failsafe" % "failsafe" % "3.3.2",
       "com.amazonaws" % "aws-java-sdk" % "1.12.397" % "provided"
         exclude ("com.fasterxml.jackson.core", "jackson-databind"),
       "com.amazonaws" % "aws-java-sdk-cloudwatch" % "1.12.593"
-        exclude("com.fasterxml.jackson.core", "jackson-databind"),
+        exclude ("com.fasterxml.jackson.core", "jackson-databind"),
       "software.amazon.awssdk" % "auth-crt" % "2.25.23",
       "org.scalactic" %% "scalactic" % "3.2.15" % "test",
       "org.scalatest" %% "scalatest" % "3.2.15" % "test",
@@ -99,11 +131,9 @@ lazy val flintCore = (project in file("flint-core"))
       "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.0" % "test",
       "com.typesafe.play" %% "play-json" % "2.9.2" % "test",
       "com.google.truth" % "truth" % "1.1.5" % "test",
-      "net.aichler" % "jupiter-interface" % "0.11.1" % Test
-    ),
+      "net.aichler" % "jupiter-interface" % "0.11.1" % Test),
     libraryDependencies ++= deps(sparkVersion),
     publish / skip := true)
-
 
 lazy val flintCommons = (project in file("flint-commons"))
   .settings(
@@ -114,8 +144,7 @@ lazy val flintCommons = (project in file("flint-commons"))
       "org.scalactic" %% "scalactic" % "3.2.15" % "test",
       "org.scalatest" %% "scalatest" % "3.2.15" % "test",
       "org.scalatest" %% "scalatest-flatspec" % "3.2.15" % "test",
-      "org.scalatestplus" %% "mockito-4-6" % "3.2.15.0" % "test",
-    ),
+      "org.scalatestplus" %% "mockito-4-6" % "3.2.15.0" % "test"),
     libraryDependencies ++= deps(sparkVersion),
     publish / skip := true,
     assembly / test := (Test / test).value,
@@ -123,18 +152,16 @@ lazy val flintCommons = (project in file("flint-commons"))
       _.withIncludeScala(false)
     },
     assembly / assemblyMergeStrategy := {
-      case PathList(ps@_*) if ps.last endsWith ("module-info.class") =>
+      case PathList(ps @ _*) if ps.last endsWith ("module-info.class") =>
         MergeStrategy.discard
       case PathList("module-info.class") => MergeStrategy.discard
-      case PathList("META-INF", "versions", xs@_, "module-info.class") =>
+      case PathList("META-INF", "versions", xs @ _, "module-info.class") =>
         MergeStrategy.discard
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
-    },
-  )
+    })
   .enablePlugins(AssemblyPlugin)
-
 
 lazy val pplSparkIntegration = (project in file("ppl-spark-integration"))
   .enablePlugins(AssemblyPlugin, Antlr4Plugin)
@@ -217,7 +244,11 @@ lazy val AwsIntegrationTest = config("aws-it") extend Test
 
 // Test assembly package with integration test.
 lazy val integtest = (project in file("integ-test"))
-  .dependsOn(flintCommons % "test->test", flintSparkIntegration % "test->test", pplSparkIntegration % "test->test", sparkSqlApplication % "test->test")
+  .dependsOn(
+    flintCommons % "test->test",
+    flintSparkIntegration % "test->test",
+    pplSparkIntegration % "test->test",
+    sparkSqlApplication % "test->test")
   .configs(IntegrationTest, AwsIntegrationTest)
   .settings(
     commonSettings,
@@ -226,20 +257,19 @@ lazy val integtest = (project in file("integ-test"))
     javaOptions ++= Seq(
       s"-DappJar=${(sparkSqlApplication / assembly).value.getAbsolutePath}",
       s"-DextensionJar=${(flintSparkIntegration / assembly).value.getAbsolutePath}",
-      s"-DpplJar=${(pplSparkIntegration / assembly).value.getAbsolutePath}",
-    ),
-    inConfig(IntegrationTest)(Defaults.testSettings ++ Seq(
-      IntegrationTest / javaSource := baseDirectory.value / "src/integration/java",
-      IntegrationTest / scalaSource := baseDirectory.value / "src/integration/scala",
-      IntegrationTest / parallelExecution := false,
-      IntegrationTest / fork := true,
-    )),
-    inConfig(AwsIntegrationTest)(Defaults.testSettings ++ Seq(
-      AwsIntegrationTest / javaSource := baseDirectory.value / "src/aws-integration/java",
-      AwsIntegrationTest / scalaSource := baseDirectory.value / "src/aws-integration/scala",
-      AwsIntegrationTest / parallelExecution := false,
-      AwsIntegrationTest / fork := true,
-    )),
+      s"-DpplJar=${(pplSparkIntegration / assembly).value.getAbsolutePath}"),
+    inConfig(IntegrationTest)(
+      Defaults.testSettings ++ Seq(
+        IntegrationTest / javaSource := baseDirectory.value / "src/integration/java",
+        IntegrationTest / scalaSource := baseDirectory.value / "src/integration/scala",
+        IntegrationTest / parallelExecution := false,
+        IntegrationTest / fork := true)),
+    inConfig(AwsIntegrationTest)(
+      Defaults.testSettings ++ Seq(
+        AwsIntegrationTest / javaSource := baseDirectory.value / "src/aws-integration/java",
+        AwsIntegrationTest / scalaSource := baseDirectory.value / "src/aws-integration/scala",
+        AwsIntegrationTest / parallelExecution := false,
+        AwsIntegrationTest / fork := true)),
     libraryDependencies ++= Seq(
       "com.amazonaws" % "aws-java-sdk" % "1.12.397" % "provided"
         exclude ("com.fasterxml.jackson.core", "jackson-databind"),
@@ -250,14 +280,14 @@ lazy val integtest = (project in file("integ-test"))
       "org.apache.iceberg" %% s"iceberg-spark-runtime-$sparkMinorVersion" % icebergVersion % "test",
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.11.0" % "test"),
     libraryDependencies ++= deps(sparkVersion),
-    Test / fullClasspath ++= Seq((flintSparkIntegration / assembly).value, (pplSparkIntegration / assembly).value,
-      (sparkSqlApplication / assembly).value
-    ),
+    Test / fullClasspath ++= Seq(
+      (flintSparkIntegration / assembly).value,
+      (pplSparkIntegration / assembly).value,
+      (sparkSqlApplication / assembly).value),
     IntegrationTest / dependencyClasspath ++= (Test / dependencyClasspath).value,
     AwsIntegrationTest / dependencyClasspath ++= (Test / dependencyClasspath).value,
     integration := (IntegrationTest / test).value,
-    awsIntegration := (AwsIntegrationTest / test).value
-  )
+    awsIntegration := (AwsIntegrationTest / test).value)
 lazy val integration = taskKey[Unit]("Run integration tests")
 lazy val awsIntegration = taskKey[Unit]("Run AWS integration tests")
 
@@ -276,8 +306,7 @@ lazy val sparkSqlApplication = (project in file("spark-sql-application"))
     commonSettings,
     name := "sql-job",
     scalaVersion := scala212,
-    libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % "3.2.15" % "test"),
+    libraryDependencies ++= Seq("org.scalatest" %% "scalatest" % "3.2.15" % "test"),
     libraryDependencies ++= deps(sparkVersion),
     libraryDependencies ++= Seq(
       "com.typesafe.play" %% "play-json" % "2.9.2",
@@ -285,9 +314,9 @@ lazy val sparkSqlApplication = (project in file("spark-sql-application"))
         exclude ("com.fasterxml.jackson.core", "jackson-databind"),
       // handle AmazonS3Exception
       "com.amazonaws" % "aws-java-sdk-s3" % "1.12.568" % "provided"
-        // the transitive jackson.core dependency conflicts with existing scala
-        // error: Scala module 2.13.4 requires Jackson Databind version >= 2.13.0 and < 2.14.0 -
-        // Found jackson-databind version 2.14.2
+      // the transitive jackson.core dependency conflicts with existing scala
+      // error: Scala module 2.13.4 requires Jackson Databind version >= 2.13.0 and < 2.14.0 -
+      // Found jackson-databind version 2.14.2
         exclude ("com.fasterxml.jackson.core", "jackson-databind"),
       "org.scalatest" %% "scalatest" % "3.2.15" % "test",
       "org.mockito" %% "mockito-scala" % "1.16.42" % "test",
@@ -302,17 +331,16 @@ lazy val sparkSqlApplication = (project in file("spark-sql-application"))
       _.withIncludeScala(false)
     },
     assembly / assemblyMergeStrategy := {
-      case PathList(ps@_*) if ps.last endsWith ("module-info.class") =>
+      case PathList(ps @ _*) if ps.last endsWith ("module-info.class") =>
         MergeStrategy.discard
       case PathList("module-info.class") => MergeStrategy.discard
-      case PathList("META-INF", "versions", xs@_, "module-info.class") =>
+      case PathList("META-INF", "versions", xs @ _, "module-info.class") =>
         MergeStrategy.discard
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     },
-    assembly / test := (Test / test).value
-  )
+    assembly / test := (Test / test).value)
 
 lazy val sparkSqlApplicationCosmetic = project
   .settings(

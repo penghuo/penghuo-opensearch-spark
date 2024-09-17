@@ -1,0 +1,22 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package org.apache.spark.sql.snapshot
+
+import org.opensearch.snapshot.utils.SnapshotParams
+
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader, PartitionReaderFactory}
+import org.apache.spark.sql.types.StructType
+
+class SnapshotPartitionReaderFactory(schema: StructType, snapshotParams: SnapshotParams)
+    extends PartitionReaderFactory {
+  override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
+    new SnapshotPartitionReader(
+      snapshotParams,
+      schema,
+      partition.asInstanceOf[SnapshotInputPartition])
+  }
+}

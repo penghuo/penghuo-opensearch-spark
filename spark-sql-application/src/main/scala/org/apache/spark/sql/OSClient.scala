@@ -6,18 +6,17 @@
 package org.apache.spark.sql
 
 import java.io.IOException
-import java.util.ArrayList
-import java.util.Locale
+import java.util.{ArrayList, Locale}
 
 import scala.util.{Failure, Success, Try}
 
 import org.opensearch.action.get.{GetRequest, GetResponse}
 import org.opensearch.client.RequestOptions
 import org.opensearch.client.indices.{CreateIndexRequest, GetIndexRequest}
-import org.opensearch.common.Strings
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.{NamedXContentRegistry, XContentType}
-import org.opensearch.common.xcontent.DeprecationHandler.IGNORE_DEPRECATIONS
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.core.common.Strings
+import org.opensearch.core.xcontent.{DeprecationHandler, NamedXContentRegistry}
 import org.opensearch.flint.core.{FlintClient, FlintClientBuilder, FlintOptions, IRestHighLevelClient}
 import org.opensearch.flint.core.metrics.MetricConstants
 import org.opensearch.flint.core.storage.{FlintReader, OpenSearchQueryReader, OpenSearchUpdater}
@@ -157,7 +156,10 @@ class OSClient(val flintOptions: FlintOptions) extends Logging {
     var queryBuilder: QueryBuilder = new MatchAllQueryBuilder
     if (!Strings.isNullOrEmpty(query)) {
       val parser =
-        XContentType.JSON.xContent.createParser(xContentRegistry, IGNORE_DEPRECATIONS, query)
+        XContentType.JSON.xContent.createParser(
+          xContentRegistry,
+          DeprecationHandler.IGNORE_DEPRECATIONS,
+          query)
       queryBuilder = AbstractQueryBuilder.parseInnerQueryBuilder(parser)
     }
     new OpenSearchQueryReader(

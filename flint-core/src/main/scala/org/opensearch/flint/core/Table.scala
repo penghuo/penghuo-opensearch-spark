@@ -10,8 +10,8 @@ import java.util
 
 import com.google.common.base.Strings
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.{NamedXContentRegistry, XContentType}
-import org.opensearch.common.xcontent.DeprecationHandler.IGNORE_DEPRECATIONS
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.core.xcontent.{DeprecationHandler, NamedXContentRegistry}
 import org.opensearch.flint.core.storage.FlintReader
 import org.opensearch.index.query.{AbstractQueryBuilder, MatchAllQueryBuilder, QueryBuilder}
 import org.opensearch.plugins.SearchPlugin
@@ -76,7 +76,10 @@ object Table {
   def queryBuilder(query: String): QueryBuilder = {
     if (!Strings.isNullOrEmpty(query)) {
       val parser =
-        XContentType.JSON.xContent.createParser(xContentRegistry, IGNORE_DEPRECATIONS, query)
+        XContentType.JSON.xContent.createParser(
+          xContentRegistry,
+          DeprecationHandler.IGNORE_DEPRECATIONS,
+          query)
       AbstractQueryBuilder.parseInnerQueryBuilder(parser)
     } else {
       new MatchAllQueryBuilder
