@@ -8,7 +8,7 @@ lazy val scala212 = "2.12.18"
 lazy val sparkVersion = "3.5.1"
 // Spark jackson version. Spark jackson-module-scala strictly check the jackson-databind version should compatible
 // https://github.com/FasterXML/jackson-module-scala/blob/2.18/src/main/scala/com/fasterxml/jackson/module/scala/JacksonModule.scala#L59
-lazy val jacksonVersion = "2.15.2"
+lazy val jacksonVersion = "2.17.2"
 
 // The transitive opensearch jackson-databind dependency version should align with Spark jackson databind dependency version.
 // Issue: https://github.com/opensearch-project/opensearch-spark/issues/442
@@ -54,7 +54,9 @@ lazy val commonSettings = Seq(
   Test / test := ((Test / test) dependsOn testScalastyle).value,
   dependencyOverrides ++= Seq(
     "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
-    "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion))
+    "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.17.2"
+  ))
 
 unmanagedJars in Compile += file("lib/repository-s3-2.11.2-SNAPSHOT.jar")
 
