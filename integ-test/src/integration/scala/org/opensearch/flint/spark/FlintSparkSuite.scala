@@ -15,35 +15,25 @@ import scala.util.Try
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.when
 import org.mockito.invocation.InvocationOnMock
-import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
-import org.opensearch.client.RequestOptions
-import org.opensearch.client.indices.GetIndexRequest
-import org.opensearch.flint.OpenSearchSuite
 import org.scalatestplus.mockito.MockitoSugar.mock
 
 import org.apache.spark.{FlintSuite, SparkConf}
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.flint.config.FlintSparkConf.{CHECKPOINT_MANDATORY, HOST_ENDPOINT, HOST_PORT, REFRESH_POLICY}
 import org.apache.spark.sql.streaming.StreamTest
 
 /**
  * Flint Spark suite trait that initializes [[FlintSpark]] API instance.
  */
-trait FlintSparkSuite extends QueryTest with FlintSuite with OpenSearchSuite with StreamTest {
+trait FlintSparkSuite extends QueryTest with FlintSuite with StreamTest {
 
   /** Flint Spark high level API being tested */
-  lazy protected val flint: FlintSpark = new FlintSpark(spark)
+//  lazy protected val flint: FlintSpark = new FlintSpark(spark)
   lazy protected val tableType: String = "CSV"
   lazy protected val tableOptions: String = "OPTIONS (header 'false', delimiter '\t')"
   lazy protected val catalogName: String = "spark_catalog"
 
   override protected def sparkConf: SparkConf = {
     val conf = super.sparkConf
-      .set(HOST_ENDPOINT.key, openSearchHost)
-      .set(HOST_PORT.key, openSearchPort.toString)
-      .set(REFRESH_POLICY.key, "true")
-      // Disable mandatory checkpoint for test convenience
-      .set(CHECKPOINT_MANDATORY.key, "false")
     conf
   }
 
@@ -55,33 +45,33 @@ trait FlintSparkSuite extends QueryTest with FlintSuite with OpenSearchSuite wit
     val mockExecutor = mock[ScheduledExecutorService]
     when(mockExecutor.scheduleWithFixedDelay(any[Runnable], any[Long], any[Long], any[TimeUnit]))
       .thenAnswer((_: InvocationOnMock) => mock[ScheduledFuture[_]])
-    FlintSparkIndexMonitor.executor = mockExecutor
+//    FlintSparkIndexMonitor.executor = mockExecutor
   }
 
-  protected def deleteTestIndex(testIndexNames: String*): Unit = {
-    testIndexNames.foreach(testIndex => {
-
-      /**
-       * Todo, if state is not valid, will throw IllegalStateException. Should check flint
-       * .isRefresh before cleanup resource. Current solution, (1) try to delete flint index, (2)
-       * if failed, delete index itself.
-       */
-      try {
-        flint.deleteIndex(testIndex)
-        flint.vacuumIndex(testIndex)
-      } catch {
-        // Forcefully delete index data and log entry in case of any errors, such as version conflict
-        case _: Exception =>
-          if (openSearchClient
-              .indices()
-              .exists(new GetIndexRequest(testIndex), RequestOptions.DEFAULT)) {
-            openSearchClient
-              .indices()
-              .delete(new DeleteIndexRequest(testIndex), RequestOptions.DEFAULT)
-          }
-      }
-    })
-  }
+//  protected def deleteTestIndex(testIndexNames: String*): Unit = {
+//    testIndexNames.foreach(testIndex => {
+//
+//      /**
+//       * Todo, if state is not valid, will throw IllegalStateException. Should check flint
+//       * .isRefresh before cleanup resource. Current solution, (1) try to delete flint index, (2)
+//       * if failed, delete index itself.
+//       */
+//      try {
+//        flint.deleteIndex(testIndex)
+//        flint.vacuumIndex(testIndex)
+//      } catch {
+//        // Forcefully delete index data and log entry in case of any errors, such as version conflict
+//        case _: Exception =>
+//          if (openSearchClient
+//              .indices()
+//              .exists(new GetIndexRequest(testIndex), RequestOptions.DEFAULT)) {
+//            openSearchClient
+//              .indices()
+//              .delete(new DeleteIndexRequest(testIndex), RequestOptions.DEFAULT)
+//          }
+//      }
+//    })
+//  }
 
   def deleteDirectory(dirPath: String): Try[Unit] = {
     Try {

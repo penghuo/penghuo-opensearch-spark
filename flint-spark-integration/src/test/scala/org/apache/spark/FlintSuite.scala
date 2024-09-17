@@ -5,12 +5,8 @@
 
 package org.apache.spark
 
-import org.opensearch.flint.spark.FlintSparkExtensions
-
 import org.apache.spark.sql.catalyst.expressions.CodegenObjectFactoryMode
 import org.apache.spark.sql.catalyst.optimizer.ConvertToLocalRelation
-import org.apache.spark.sql.flint.config.FlintConfigEntry
-import org.apache.spark.sql.flint.config.FlintSparkConf.HYBRID_SCAN_ENABLED
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
 
@@ -25,23 +21,23 @@ trait FlintSuite extends SharedSparkSession {
       // this rule may potentially block testing of other optimization rules such as
       // ConstantPropagation etc.
       .set(SQLConf.OPTIMIZER_EXCLUDED_RULES.key, ConvertToLocalRelation.ruleName)
-      .set("spark.sql.extensions", classOf[FlintSparkExtensions].getName)
+//      .set("spark.sql.extensions", classOf[FlintSparkExtensions].getName)
     conf
   }
 
   /**
    * Set Flint Spark configuration. (Generic "value: T" has problem with FlintConfigEntry[Any])
    */
-  protected def setFlintSparkConf[T](config: FlintConfigEntry[T], value: Any): Unit = {
-    spark.conf.set(config.key, value.toString)
-  }
+//  protected def setFlintSparkConf[T](config: FlintConfigEntry[T], value: Any): Unit = {
+//    spark.conf.set(config.key, value.toString)
+//  }
 
   protected def withHybridScanEnabled(block: => Unit): Unit = {
-    setFlintSparkConf(HYBRID_SCAN_ENABLED, "true")
-    try {
-      block
-    } finally {
-      setFlintSparkConf(HYBRID_SCAN_ENABLED, "false")
-    }
+//    setFlintSparkConf(HYBRID_SCAN_ENABLED, "true")
+//    try {
+//      block
+//    } finally {
+//      setFlintSparkConf(HYBRID_SCAN_ENABLED, "false")
+//    }
   }
 }
