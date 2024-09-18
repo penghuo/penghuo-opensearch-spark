@@ -18,6 +18,7 @@ trait FlintSuite extends SharedSparkSession {
   override protected def sparkConf = {
     val conf = new SparkConf()
       .set("spark.ui.enabled", "false")
+      .setMaster("local[16]")
       .set(SQLConf.CODEGEN_FALLBACK.key, "false")
       .set(SQLConf.CODEGEN_FACTORY_MODE.key, CodegenObjectFactoryMode.CODEGEN_ONLY.toString)
       // Disable ConvertToLocalRelation for better test coverage. Test cases built on

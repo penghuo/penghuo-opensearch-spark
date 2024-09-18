@@ -10,13 +10,15 @@ import org.opensearch.repositories.IndexId
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotTableMetadata}
 import org.opensearch.snapshots.SnapshotInfo
 
+import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReaderFactory}
 import org.apache.spark.sql.types.StructType
 
 class SnapshotBatch(
     val schema: StructType,
     val snapshotParams: SnapshotParams,
-    val snapshotTableMetadata: SnapshotTableMetadata)
+    val snapshotTableMetadata: SnapshotTableMetadata,
+    pushedPredicates: Array[Predicate])
     extends Batch {
 
   override def planInputPartitions(): Array[InputPartition] = {
@@ -34,6 +36,6 @@ class SnapshotBatch(
   }
 
   override def createReaderFactory(): PartitionReaderFactory = {
-    new SnapshotPartitionReaderFactory(schema, snapshotParams)
+    new SnapshotPartitionReaderFactory(schema, snapshotParams, pushedPredicates)
   }
 }

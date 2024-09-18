@@ -98,10 +98,10 @@ public class SnapshotUtil {
     final Settings.Builder clientSettings = Settings.builder();
     clientSettings.put("s3.client.default.region", snapshotParams.getS3Region());
     final MockSecureSettings secureSettings = new MockSecureSettings();
-    secureSettings.setString(
-        "s3.client.default.access_key", snapshotParams.getS3AccessKey());
-    secureSettings.setString(
-        "s3.client.default.secret_key", snapshotParams.getS3SecretKey());
+//    secureSettings.setString(
+//        "s3.client.default.access_key", snapshotParams.getS3AccessKey());
+//    secureSettings.setString(
+//        "s3.client.default.secret_key", snapshotParams.getS3SecretKey());
     clientSettings.setSecureSettings(secureSettings);
     s3Service.refreshAndClearCache(S3ClientSettings.load(clientSettings.build(), configPath));
     SocketAccess.doPrivileged(

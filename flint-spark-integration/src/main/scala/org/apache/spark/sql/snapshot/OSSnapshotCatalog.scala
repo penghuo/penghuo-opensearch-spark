@@ -9,13 +9,14 @@ import java.util
 
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotUtil}
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.{NoSuchTableException, TableAlreadyExistsException}
 import org.apache.spark.sql.connector.catalog._
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
-class OSSnapshotCatalog extends CatalogPlugin with TableCatalog {
+class OSSnapshotCatalog extends CatalogPlugin with TableCatalog with Logging {
   private var cname: String = null
   private var snapshotName: String = null
   private var s3Bucket: String = null
@@ -51,6 +52,8 @@ class OSSnapshotCatalog extends CatalogPlugin with TableCatalog {
       .tableName(ident.name)
       .build
     try {
+      logInfo(
+        s"namespace: ${ident.namespace().mkString("Array(", ", ", ")")}, name: ${ident.name()}")
       val s3BlobStore = SnapshotUtil.createS3BlobStore(snapshotParams)
       try {
         val snapshotTableMetadata =

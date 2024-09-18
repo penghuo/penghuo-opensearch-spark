@@ -37,6 +37,10 @@ ThisBuild / scalastyleConfig := baseDirectory.value / "scalastyle-config.xml"
  */
 ThisBuild / Test / parallelExecution := false
 
+ThisBuild / assemblyShadeRules := Seq(
+  ShadeRule.rename("com.fasterxml.jackson.**" -> "shaded.com.fasterxml.jackson.@1").inAll
+)
+
 // Run as part of compile task.
 lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
 
@@ -55,8 +59,7 @@ lazy val commonSettings = Seq(
   dependencyOverrides ++= Seq(
     "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
-    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.17.2"
-  ))
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.17.2"))
 
 unmanagedJars in Compile += file("lib/repository-s3-2.11.2-SNAPSHOT.jar")
 
@@ -93,34 +96,44 @@ lazy val flintCore = (project in file("flint-core"))
       "org.opensearch" % "opensearch-common" % opensearchVersion,
       "org.opensearch" % "opensearch-core" % opensearchVersion,
       "org.opensearch" % "opensearch" % opensearchVersion,
-      "software.amazon.awssdk" % "sdk-core" % versionsAws,
-      "software.amazon.awssdk" % "annotations" % versionsAws,
-      "software.amazon.awssdk" % "aws-core" % versionsAws,
-      "software.amazon.awssdk" % "auth" % versionsAws,
-      "software.amazon.awssdk" % "endpoints-spi" % versionsAws,
-      "software.amazon.awssdk" % "http-client-spi" % versionsAws,
-      "software.amazon.awssdk" % "apache-client" % versionsAws,
-      "software.amazon.awssdk" % "metrics-spi" % versionsAws,
-      "software.amazon.awssdk" % "profiles" % versionsAws,
-      "software.amazon.awssdk" % "regions" % versionsAws,
-      "software.amazon.awssdk" % "utils" % versionsAws,
-      "software.amazon.awssdk" % "aws-json-protocol" % versionsAws,
-      "software.amazon.awssdk" % "protocol-core" % versionsAws,
-      "software.amazon.awssdk" % "json-utils" % versionsAws,
-      "software.amazon.awssdk" % "third-party-jackson-core" % versionsAws,
-      "software.amazon.awssdk" % "s3" % versionsAws,
-      "software.amazon.awssdk" % "signer" % versionsAws,
-      "software.amazon.awssdk" % "aws-xml-protocol" % versionsAws,
-      "software.amazon.awssdk" % "aws-query-protocol" % versionsAws,
-      "software.amazon.awssdk" % "sts" % versionsAws,
-      "software.amazon.awssdk" % "netty-nio-client" % versionsAws,
+      "software.amazon.awssdk" % "sdk-core" % versionsAws % "provided"
+        exclude ("software.amazon.awssdk", "json-utils")
+        exclude ("software.amazon.awssdk", "third-party-jackson-core"),
+//      "software.amazon.awssdk" % "annotations" % versionsAws,
+      "software.amazon.awssdk" % "aws-core" % versionsAws % "provided"
+        exclude ("software.amazon.awssdk", "json-utils")
+        exclude ("software.amazon.awssdk", "third-party-jackson-core"),
+      "software.amazon.awssdk" % "auth" % versionsAws % "provided"
+        exclude ("software.amazon.awssdk", "json-utils")
+        exclude ("software.amazon.awssdk", "third-party-jackson-core"),
+//      "software.amazon.awssdk" % "endpoints-spi" % versionsAws,
+//      "software.amazon.awssdk" % "http-client-spi" % versionsAws,
+//      "software.amazon.awssdk" % "apache-client" % versionsAws,
+//      "software.amazon.awssdk" % "metrics-spi" % versionsAws,
+//      "software.amazon.awssdk" % "profiles" % versionsAws,
+      "software.amazon.awssdk" % "regions" % versionsAws % "provided"
+        exclude ("software.amazon.awssdk", "json-utils")
+        exclude ("software.amazon.awssdk", "third-party-jackson-core"),
+//      "software.amazon.awssdk" % "utils" % versionsAws,
+//      "software.amazon.awssdk" % "aws-json-protocol" % versionsAws,
+//      "software.amazon.awssdk" % "protocol-core" % versionsAws,
+//      "software.amazon.awssdk" % "json-utils" % versionsAws,
+      "software.amazon.awssdk" % "s3" % versionsAws % "provided"
+        exclude ("software.amazon.awssdk", "json-utils")
+        exclude ("software.amazon.awssdk", "third-party-jackson-core"),
+//      "software.amazon.awssdk" % "signer" % versionsAws,
+//      "software.amazon.awssdk" % "aws-xml-protocol" % versionsAws,
+//      "software.amazon.awssdk" % "aws-query-protocol" % versionsAws,
+//      "software.amazon.awssdk" % "sts" % versionsAws,
       "org.json" % "json" % "20210307",
       "dev.failsafe" % "failsafe" % "3.3.2",
       "com.amazonaws" % "aws-java-sdk" % "1.12.397" % "provided"
         exclude ("com.fasterxml.jackson.core", "jackson-databind"),
       "com.amazonaws" % "aws-java-sdk-cloudwatch" % "1.12.593"
         exclude ("com.fasterxml.jackson.core", "jackson-databind"),
-      "software.amazon.awssdk" % "auth-crt" % "2.25.23",
+      "software.amazon.awssdk" % "auth-crt" % "2.25.23"
+        exclude ("software.amazon.awssdk", "json-utils")
+        exclude ("software.amazon.awssdk", "third-party-jackson-core"),
       "org.scalactic" %% "scalactic" % "3.2.15" % "test",
       "org.scalatest" %% "scalatest" % "3.2.15" % "test",
       "org.scalatest" %% "scalatest-flatspec" % "3.2.15" % "test",
@@ -235,11 +248,8 @@ lazy val flintSparkIntegration = (project in file("flint-spark-integration"))
       case PathList("module-info.class") => MergeStrategy.discard
       case PathList("META-INF", "versions", xs @ _, "module-info.class") =>
         MergeStrategy.discard
-      case x =>
-        val oldStrategy = (assembly / assemblyMergeStrategy).value
-        oldStrategy(x)
-    },
-    assembly / test := (Test / test).value)
+      case x => MergeStrategy.first
+    })
 
 lazy val IntegrationTest = config("it") extend Test
 lazy val AwsIntegrationTest = config("aws-it") extend Test

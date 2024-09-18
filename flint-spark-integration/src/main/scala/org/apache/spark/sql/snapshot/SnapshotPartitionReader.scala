@@ -12,7 +12,7 @@ import scala.collection.JavaConverters
 
 import org.apache.lucene.document.Document
 import org.apache.lucene.index.{DirectoryReader, IndexReader}
-import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, ScoreDoc}
+import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, Query, ScoreDoc}
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotUtil}
 
 import org.apache.spark.internal.Logging
@@ -28,7 +28,8 @@ import org.apache.spark.unsafe.types.UTF8String
 class SnapshotPartitionReader(
     snapshotParams: SnapshotParams,
     schema: StructType,
-    snapshotInputPartition: SnapshotInputPartition)
+    snapshotInputPartition: SnapshotInputPartition,
+    query: Query)
     extends PartitionReader[InternalRow]
     with Logging {
   private val indexReader: IndexReader = DirectoryReader.open(
@@ -38,13 +39,7 @@ class SnapshotPartitionReader(
       snapshotInputPartition.indexId,
       snapshotInputPartition.shardId))
   private val indexSearcher: IndexSearcher = new IndexSearcher(indexReader)
-  private val scoreDocs: Iterator[ScoreDoc] = JavaConverters.asJavaIterator(
-    indexSearcher
-      .search(new MatchAllDocsQuery(), Integer.MAX_VALUE)
-      .scoreDocs
-      .iterator)
-
-  logInfo(s"Partition Num: ${snapshotInputPartition.shardId}")
+  private var scoreDocs: Iterator[ScoreDoc] = null
 
   private val conf: CaseInsensitiveMap[String] = CaseInsensitiveMap(Map.empty[String, String])
   private val parsedOptions: JSONOptions =
@@ -58,13 +53,29 @@ class SnapshotPartitionReader(
     schema,
     parsedOptions.columnNameOfCorruptRecord)
 
-  override def next(): Boolean = scoreDocs.hasNext
+  override def next(): Boolean = {
+    if (scoreDocs == null) {
+      val startTime = System.currentTimeMillis()
+      scoreDocs = JavaConverters.asJavaIterator(
+        indexSearcher
+          .search(query, 10)
+          .scoreDocs
+          .iterator)
+      val endTime = System.currentTimeMillis()
+      logInfo(s"Time taken to search: ${endTime - startTime} ms")
+    }
+    scoreDocs.hasNext
+  }
 
   override def get(): InternalRow = {
     try {
+      val startTime = System.currentTimeMillis()
       val scoreDoc = scoreDocs.next()
       val doc = indexSearcher.doc(scoreDoc.doc)
-      convertToInternalRow(doc)
+      val row = convertToInternalRow(doc)
+      val endTime = System.currentTimeMillis()
+      logInfo(s"Time taken to convert to internal row: ${endTime - startTime} ms")
+      row
     } catch {
       case e: IOException =>
         throw new NoSuchElementException(s"Failed to retrieve next document: ${e.getMessage}")
@@ -79,7 +90,7 @@ class SnapshotPartitionReader(
 
   override def close(): Unit = {
     if (indexReader != null) {
-      logInfo("Close: 1")
+      logInfo(s"Close ${snapshotInputPartition.shardId}")
       indexReader.close()
     }
   }
