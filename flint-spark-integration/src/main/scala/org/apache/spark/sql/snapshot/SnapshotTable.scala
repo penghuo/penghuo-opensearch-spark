@@ -14,7 +14,7 @@ import org.apache.spark.sql.connector.read.ScanBuilder
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
-class SnapshotTable(
+case class SnapshotTable(
     override val schema: StructType,
     private val snapshotParams: SnapshotParams,
     private val snapshotTableMetadata: SnapshotTableMetadata)

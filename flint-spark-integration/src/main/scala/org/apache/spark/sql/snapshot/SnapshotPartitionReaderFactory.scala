@@ -10,7 +10,6 @@ import org.opensearch.snapshot.utils.SnapshotParams
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader, PartitionReaderFactory}
-import org.apache.spark.sql.flint.storage.FlintQueryCompiler
 import org.apache.spark.sql.types.StructType
 
 class SnapshotPartitionReaderFactory(

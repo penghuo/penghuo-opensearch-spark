@@ -26,7 +26,7 @@ class OSSnapshotCatalog extends CatalogPlugin with TableCatalog with Logging {
   private var basePath: String = null
 
   override def initialize(name: String, options: CaseInsensitiveStringMap): Unit = {
-    this.cname = cname
+    this.cname = name
     this.snapshotName = options.get("snapshot.name")
     this.s3Bucket = options.get("s3.bucket")
     this.s3Region = options.get("s3.region")
@@ -47,20 +47,20 @@ class OSSnapshotCatalog extends CatalogPlugin with TableCatalog with Logging {
       .s3Bucket(s3Bucket)
       .basePath(basePath)
       .s3Region(s3Region)
-      .s3AccessKey(s3AccessKey)
-      .s3SecretKey(s3SecretKey)
       .tableName(ident.name)
       .build
     try {
       logInfo(
-        s"namespace: ${ident.namespace().mkString("Array(", ", ", ")")}, name: ${ident.name()}")
+        s"namespace: ${ident.namespace().mkString("Array(", ", ", ")")}, name: ${ident.name}")
       val s3BlobStore = SnapshotUtil.createS3BlobStore(snapshotParams)
       try {
         val snapshotTableMetadata =
           SnapshotUtil.getSnapshotTableMetadata(s3BlobStore, snapshotParams)
         val schema =
           SnapshotUtil.createSparkSchema(snapshotTableMetadata.getIndexMetadata.mapping)
-        new SnapshotTable(schema, snapshotParams, snapshotTableMetadata)
+        val snapshotTable = SnapshotTable(schema, snapshotParams, snapshotTableMetadata)
+        logInfo(s"tableName: ${snapshotTable.name()}")
+        snapshotTable
       } catch {
         case e: Exception =>
           throw new NoSuchTableException(ident)

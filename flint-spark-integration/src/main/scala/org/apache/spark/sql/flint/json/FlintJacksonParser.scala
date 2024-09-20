@@ -12,12 +12,12 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
 import com.fasterxml.jackson.core._
+import com.fasterxml.jackson.core.json.JsonReadFeature
 
 import org.apache.spark.SparkUpgradeException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.{InternalRow, NoopFilters, StructFilters}
 import org.apache.spark.sql.catalyst.expressions.{Cast, EmptyRow, ExprUtils, GenericInternalRow, Literal}
-import org.apache.spark.sql.catalyst.json.{JacksonUtils, JsonFilters, JSONOptions}
 import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, ArrayData, BadRecordException, DateFormatter, DateTimeUtils, GenericArrayData, IntervalUtils, MapData, PartialResultException, RebaseDateTime, TimestampFormatter}
 import org.apache.spark.sql.catalyst.util.LegacyDateFormats.FAST_DATE_FORMAT
 import org.apache.spark.sql.errors.QueryExecutionErrors
@@ -40,7 +40,7 @@ class FlintJacksonParser(
     filters: Seq[Filter] = Seq.empty)
     extends Logging {
 
-  import JacksonUtils._
+  import FlintJacksonUtils._
   import com.fasterxml.jackson.core.JsonToken._
 
   // A `ValueConverter` is responsible for converting a value from `JsonParser`
@@ -50,7 +50,15 @@ class FlintJacksonParser(
   // `ValueConverter`s for the root schema for all fields in the schema
   private val rootConverter = makeRootConverter(schema)
 
-  private val factory = options.buildJsonFactory()
+  private val factory = new JsonFactoryBuilder()
+    .configure(JsonReadFeature.ALLOW_JAVA_COMMENTS, false)
+    .configure(JsonReadFeature.ALLOW_UNQUOTED_FIELD_NAMES, false)
+    .configure(JsonReadFeature.ALLOW_SINGLE_QUOTES, false)
+    .configure(JsonReadFeature.ALLOW_LEADING_ZEROS_FOR_NUMBERS, false)
+    .configure(JsonReadFeature.ALLOW_NON_NUMERIC_NUMBERS, false)
+    .configure(JsonReadFeature.ALLOW_BACKSLASH_ESCAPING_ANY_CHARACTER, false)
+    .configure(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS, false)
+    .build()
 
   private lazy val timestampFormatter = TimestampFormatter(
     options.timestampFormatInRead,
@@ -87,7 +95,7 @@ class FlintJacksonParser(
     val elementConverter = makeConverter(st)
     val fieldConverters = st.map(_.dataType).map(makeConverter).toArray
     val jsonFilters = if (SQLConf.get.jsonFilterPushDown) {
-      new JsonFilters(filters, st)
+      new FlintJsonFilters(filters, st)
     } else {
       new NoopFilters
     }

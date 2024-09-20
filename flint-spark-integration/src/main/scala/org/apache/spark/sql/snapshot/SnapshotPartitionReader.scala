@@ -10,18 +10,19 @@ import java.util.{Iterator, NoSuchElementException}
 
 import scala.collection.JavaConverters
 
+import com.fasterxml.jackson.core.{JsonFactory, JsonParser}
 import org.apache.lucene.document.Document
 import org.apache.lucene.index.{DirectoryReader, IndexReader}
-import org.apache.lucene.search.{IndexSearcher, MatchAllDocsQuery, Query, ScoreDoc}
+import org.apache.lucene.search.{IndexSearcher, Query, ScoreDoc}
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotUtil}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.json.{CreateJacksonParser, JacksonParser, JSONOptions, JSONOptionsInRead}
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, FailureSafeParser}
 import org.apache.spark.sql.connector.read.PartitionReader
+import org.apache.spark.sql.flint.datatype.FlintDataType.DATE_FORMAT_PARAMETERS
+import org.apache.spark.sql.flint.json.{FlintCreateJacksonParser, FlintJacksonParser, JSONOptions, JSONOptionsInRead}
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -41,17 +42,20 @@ class SnapshotPartitionReader(
   private val indexSearcher: IndexSearcher = new IndexSearcher(indexReader)
   private var scoreDocs: Iterator[ScoreDoc] = null
 
-  private val conf: CaseInsensitiveMap[String] = CaseInsensitiveMap(Map.empty[String, String])
   private val parsedOptions: JSONOptions =
-    new JSONOptionsInRead(conf, SQLConf.get.sessionLocalTimeZone, "")
-  private val parser: JacksonParser =
-    new JacksonParser(schema, parsedOptions, true, Seq.empty[Filter])
-
-  private val safeParser: FailureSafeParser[String] = new FailureSafeParser[String](
-    input => parser.parse(input, CreateJacksonParser.string, UTF8String.fromString),
-    parsedOptions.parseMode,
+    new JSONOptionsInRead(
+      CaseInsensitiveMap(DATE_FORMAT_PARAMETERS),
+      SQLConf.get.sessionLocalTimeZone,
+      "")
+  private val parser: FlintJacksonParser =
+    new FlintJacksonParser(schema, parsedOptions, allowArrayAsStructs = true)
+  lazy val stringParser: (JsonFactory, String) => JsonParser =
+    FlintCreateJacksonParser.string(_: JsonFactory, _: String)
+  lazy val safeParser = new FailureSafeParser[String](
+    input => parser.parse(input, stringParser, UTF8String.fromString),
+    parser.options.parseMode,
     schema,
-    parsedOptions.columnNameOfCorruptRecord)
+    parser.options.columnNameOfCorruptRecord)
 
   override def next(): Boolean = {
     if (scoreDocs == null) {

@@ -9,12 +9,12 @@ import com.fasterxml.jackson.core.{JsonFactory, JsonParser}
 import org.opensearch.flint.core.storage.FlintReader
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.json.{CreateJacksonParser, JSONOptionsInRead}
+import org.apache.spark.sql.catalyst.json.CreateJacksonParser
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, FailureSafeParser}
 import org.apache.spark.sql.connector.read.PartitionReader
 import org.apache.spark.sql.flint.config.FlintSparkConf
 import org.apache.spark.sql.flint.datatype.FlintDataType.DATE_FORMAT_PARAMETERS
-import org.apache.spark.sql.flint.json.FlintJacksonParser
+import org.apache.spark.sql.flint.json.{FlintJacksonParser, JSONOptionsInRead}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.types.UTF8String
 

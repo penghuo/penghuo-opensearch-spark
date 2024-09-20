@@ -2,7 +2,9 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-import Dependencies._
+import Dependencies.*
+import com.eed3si9n.jarjarabrams
+import sbtassembly.AssemblyPlugin.autoImport.ShadeRule
 
 lazy val scala212 = "2.12.18"
 lazy val sparkVersion = "3.5.1"
@@ -38,8 +40,8 @@ ThisBuild / scalastyleConfig := baseDirectory.value / "scalastyle-config.xml"
 ThisBuild / Test / parallelExecution := false
 
 ThisBuild / assemblyShadeRules := Seq(
-  ShadeRule.rename("com.fasterxml.jackson.**" -> "shaded.com.fasterxml.jackson.@1").inAll
-)
+  ShadeRule.rename("com.fasterxml.jackson.**" -> "shaded.com.fasterxml.jackson.@1").inAll,
+  ShadeRule.rename("software.amazon.awssdk.**" -> "shaded.software.amazon.awssdk.@1").inAll)
 
 // Run as part of compile task.
 lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
@@ -96,29 +98,29 @@ lazy val flintCore = (project in file("flint-core"))
       "org.opensearch" % "opensearch-common" % opensearchVersion,
       "org.opensearch" % "opensearch-core" % opensearchVersion,
       "org.opensearch" % "opensearch" % opensearchVersion,
-      "software.amazon.awssdk" % "sdk-core" % versionsAws % "provided"
+      "software.amazon.awssdk" % "sdk-core" % versionsAws
         exclude ("software.amazon.awssdk", "json-utils")
         exclude ("software.amazon.awssdk", "third-party-jackson-core"),
-//      "software.amazon.awssdk" % "annotations" % versionsAws,
-      "software.amazon.awssdk" % "aws-core" % versionsAws % "provided"
+      "software.amazon.awssdk" % "annotations" % versionsAws,
+      "software.amazon.awssdk" % "aws-core" % versionsAws
         exclude ("software.amazon.awssdk", "json-utils")
         exclude ("software.amazon.awssdk", "third-party-jackson-core"),
-      "software.amazon.awssdk" % "auth" % versionsAws % "provided"
+      "software.amazon.awssdk" % "auth" % versionsAws
         exclude ("software.amazon.awssdk", "json-utils")
         exclude ("software.amazon.awssdk", "third-party-jackson-core"),
 //      "software.amazon.awssdk" % "endpoints-spi" % versionsAws,
-//      "software.amazon.awssdk" % "http-client-spi" % versionsAws,
-//      "software.amazon.awssdk" % "apache-client" % versionsAws,
+      "software.amazon.awssdk" % "http-client-spi" % versionsAws,
+      "software.amazon.awssdk" % "apache-client" % versionsAws,
 //      "software.amazon.awssdk" % "metrics-spi" % versionsAws,
 //      "software.amazon.awssdk" % "profiles" % versionsAws,
-      "software.amazon.awssdk" % "regions" % versionsAws % "provided"
+      "software.amazon.awssdk" % "regions" % versionsAws
         exclude ("software.amazon.awssdk", "json-utils")
         exclude ("software.amazon.awssdk", "third-party-jackson-core"),
-//      "software.amazon.awssdk" % "utils" % versionsAws,
-//      "software.amazon.awssdk" % "aws-json-protocol" % versionsAws,
-//      "software.amazon.awssdk" % "protocol-core" % versionsAws,
-//      "software.amazon.awssdk" % "json-utils" % versionsAws,
-      "software.amazon.awssdk" % "s3" % versionsAws % "provided"
+      "software.amazon.awssdk" % "utils" % versionsAws,
+      "software.amazon.awssdk" % "aws-json-protocol" % versionsAws,
+      "software.amazon.awssdk" % "protocol-core" % versionsAws,
+      "software.amazon.awssdk" % "json-utils" % versionsAws,
+      "software.amazon.awssdk" % "s3" % versionsAws
         exclude ("software.amazon.awssdk", "json-utils")
         exclude ("software.amazon.awssdk", "third-party-jackson-core"),
 //      "software.amazon.awssdk" % "signer" % versionsAws,
@@ -243,6 +245,8 @@ lazy val flintSparkIntegration = (project in file("flint-spark-integration"))
       _.withIncludeScala(false)
     },
     assembly / assemblyMergeStrategy := {
+      case PathList("META-INF", "services", xs @ _*) =>
+        MergeStrategy.concat
       case PathList(ps @ _*) if ps.last endsWith ("module-info.class") =>
         MergeStrategy.discard
       case PathList("module-info.class") => MergeStrategy.discard
