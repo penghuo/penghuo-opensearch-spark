@@ -15,6 +15,7 @@ lazy val jacksonVersion = "2.17.2"
 // The transitive opensearch jackson-databind dependency version should align with Spark jackson databind dependency version.
 // Issue: https://github.com/opensearch-project/opensearch-spark/issues/442
 lazy val opensearchVersion = "2.15.0"
+lazy val opensearchSnapshotVersion = "2.15.1-SNAPSHOT"
 lazy val icebergVersion = "1.5.0"
 lazy val versionsAws = "2.25.23"
 
@@ -63,8 +64,6 @@ lazy val commonSettings = Seq(
     "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.17.2"))
 
-unmanagedJars in Compile += file("lib/repository-s3-2.11.2-SNAPSHOT.jar")
-
 // running `scalafmtAll` includes all subprojects under root
 lazy val root = (project in file("."))
   .aggregate(
@@ -84,9 +83,12 @@ lazy val flintCore = (project in file("flint-core"))
     commonSettings,
     name := "flint-core",
     scalaVersion := scala212,
+    resolvers += Resolver.mavenLocal,
     libraryDependencies ++= Seq(
-      "org.opensearch.client" % "opensearch-rest-client" % opensearchVersion,
+      "org.opensearch.client" % "opensearch-rest-client" % opensearchVersion
+        exclude ("org.opensearch", "opensearch"),
       "org.opensearch.client" % "opensearch-rest-high-level-client" % opensearchVersion
+        exclude ("org.opensearch", "opensearch")
         exclude ("org.apache.logging.log4j", "log4j-api"),
       "org.opensearch.client" % "opensearch-java" % "2.11.0"
       // error: Scala module 2.13.4 requires Jackson Databind version >= 2.13.0 and < 2.14.0 -
@@ -94,10 +96,10 @@ lazy val flintCore = (project in file("flint-core"))
         exclude ("com.fasterxml.jackson.core", "jackson-databind")
         exclude ("com.fasterxml.jackson.core", "jackson-core")
         exclude ("org.apache.httpcomponents.client5", "httpclient5"),
-      "org.opensearch" % "opensearch-x-content" % opensearchVersion,
-      "org.opensearch" % "opensearch-common" % opensearchVersion,
-      "org.opensearch" % "opensearch-core" % opensearchVersion,
-      "org.opensearch" % "opensearch" % opensearchVersion,
+      "org.opensearch" % "opensearch-x-content" % opensearchSnapshotVersion,
+      "org.opensearch" % "opensearch-common" % opensearchSnapshotVersion,
+      "org.opensearch" % "opensearch-core" % opensearchSnapshotVersion,
+      "org.opensearch" % "opensearch" % opensearchSnapshotVersion,
       "software.amazon.awssdk" % "sdk-core" % versionsAws
         exclude ("software.amazon.awssdk", "json-utils")
         exclude ("software.amazon.awssdk", "third-party-jackson-core"),

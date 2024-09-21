@@ -8,7 +8,9 @@ package org.apache.spark.sql.snapshot
 import scala.io.Source
 
 import org.apache.lucene.index.Term
-import org.apache.lucene.search.{MatchAllDocsQuery, Query, TermQuery}
+import org.apache.lucene.queryparser.xml.builders.BooleanQueryBuilder
+import org.apache.lucene.search.{BooleanClause, BooleanQuery, FieldExistsQuery, MatchAllDocsQuery, Query, TermQuery}
+import org.opensearch.index.mapper.FieldNamesFieldMapper
 
 import org.apache.spark.sql.catalyst.expressions.Literal
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, TimestampFormatter}
@@ -42,10 +44,29 @@ case class QueryCompiler(schema: StructType) {
   def visitPredicate(p: Predicate): Query = {
     val name = p.name()
     name match {
+      case "IS_NOT_NULL" => new MatchAllDocsQuery
+//        new TermQuery(new Term(FieldNamesFieldMapper.NAME, visitFieldValue(p.children()(0))))
+      case "AND" =>
+        new BooleanQuery.Builder()
+          .add(compile(p.children()(0)), BooleanClause.Occur.MUST)
+          .add(compile(p.children()(1)), BooleanClause.Occur.MUST)
+          .build()
+      case "OR" =>
+        new BooleanQuery.Builder()
+          .add(compile(p.children()(0)), BooleanClause.Occur.SHOULD)
+          .add(compile(p.children()(1)), BooleanClause.Occur.SHOULD)
+          .build()
       case "=" =>
         new TermQuery(
           new Term(visitFieldValue(p.children()(0)), visitFieldValue(p.children()(1))))
       case _ => new MatchAllDocsQuery()
+    }
+  }
+
+  def compile(expr: Expression): Query = {
+    expr match {
+      case p: Predicate => visitPredicate(p)
+      case _ => throw new UnsupportedOperationException(s"Must be predicated, but got $expr")
     }
   }
 
@@ -60,7 +81,7 @@ case class QueryCompiler(schema: StructType) {
     case _ => Literal(value, dataType).toString()
   }
 
-  def quote(f: ((Any, DataType) => String), quoteString: Boolean = true)(
+  def quote(f: ((Any, DataType) => String), quoteString: Boolean = false)(
       value: Any,
       dataType: DataType): String =
     dataType match {
@@ -69,7 +90,7 @@ case class QueryCompiler(schema: StructType) {
       case _ => f(value, dataType)
     }
 
-  def visitFieldValue(expr: Expression, quoteString: Boolean = true): String = {
+  def visitFieldValue(expr: Expression, quoteString: Boolean = false): String = {
     expr match {
       case LiteralValue(value, dataType) =>
         quote(extract, quoteString)(value, dataType)

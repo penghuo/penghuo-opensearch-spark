@@ -13,7 +13,8 @@ import scala.collection.JavaConverters
 import com.fasterxml.jackson.core.{JsonFactory, JsonParser}
 import org.apache.lucene.document.Document
 import org.apache.lucene.index.{DirectoryReader, IndexReader}
-import org.apache.lucene.search.{IndexSearcher, Query, ScoreDoc}
+import org.apache.lucene.search._
+import org.apache.lucene.search.SortField.Type
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotUtil}
 
 import org.apache.spark.internal.Logging
@@ -30,16 +31,14 @@ class SnapshotPartitionReader(
     snapshotParams: SnapshotParams,
     schema: StructType,
     snapshotInputPartition: SnapshotInputPartition,
-    query: Query)
+    query: Query,
+    pushedSort: String,
+    pushedLimit: Int)
     extends PartitionReader[InternalRow]
     with Logging {
-  private val indexReader: IndexReader = DirectoryReader.open(
-    SnapshotUtil.getRemoteSnapShotDirectory(
-      snapshotParams,
-      snapshotInputPartition.snapshotUUID,
-      snapshotInputPartition.indexId,
-      snapshotInputPartition.shardId))
-  private val indexSearcher: IndexSearcher = new IndexSearcher(indexReader)
+
+  private var indexReader: IndexReader = null
+  private var indexSearcher: IndexSearcher = null
   private var scoreDocs: Iterator[ScoreDoc] = null
 
   private val parsedOptions: JSONOptions =
@@ -59,13 +58,33 @@ class SnapshotPartitionReader(
 
   override def next(): Boolean = {
     if (scoreDocs == null) {
-      val startTime = System.currentTimeMillis()
+      var startTime = System.currentTimeMillis()
+      indexReader = DirectoryReader.open(
+        SnapshotUtil.getRemoteSnapShotDirectory(
+          snapshotParams,
+          snapshotInputPartition.snapshotUUID,
+          snapshotInputPartition.indexId,
+          snapshotInputPartition.shardId))
+      indexSearcher = new IndexSearcher(indexReader)
+      var endTime = System.currentTimeMillis()
+      logInfo(s"Time taken to init: ${endTime - startTime} ms")
+
+      startTime = System.currentTimeMillis()
+      var sortField = new Sort(SortField.FIELD_DOC)
+      if (!pushedSort.isBlank && !pushedSort.isEmpty) {
+        sortField = new Sort(new SortedNumericSortField(pushedSort, Type.LONG, true))
+      }
+
+      val collectorManager =
+        new TopFieldCollectorManager(sortField, pushedLimit, 1)
       scoreDocs = JavaConverters.asJavaIterator(
-        indexSearcher
-          .search(query, 10)
-          .scoreDocs
-          .iterator)
-      val endTime = System.currentTimeMillis()
+        indexSearcher.search(query, collectorManager).scoreDocs.iterator)
+//      scoreDocs = JavaConverters.asJavaIterator(
+//        indexSearcher
+//          .search(query, 10)
+//          .scoreDocs
+//          .iterator)
+      endTime = System.currentTimeMillis()
       logInfo(s"Time taken to search: ${endTime - startTime} ms")
     }
     scoreDocs.hasNext
@@ -73,12 +92,9 @@ class SnapshotPartitionReader(
 
   override def get(): InternalRow = {
     try {
-      val startTime = System.currentTimeMillis()
       val scoreDoc = scoreDocs.next()
       val doc = indexSearcher.doc(scoreDoc.doc)
       val row = convertToInternalRow(doc)
-      val endTime = System.currentTimeMillis()
-      logInfo(s"Time taken to convert to internal row: ${endTime - startTime} ms")
       row
     } catch {
       case e: IOException =>

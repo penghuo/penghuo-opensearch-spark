@@ -15,7 +15,9 @@ import org.apache.spark.sql.types.StructType
 class SnapshotPartitionReaderFactory(
     schema: StructType,
     snapshotParams: SnapshotParams,
-    pushedPredicates: Array[Predicate])
+    pushedPredicates: Array[Predicate],
+    pushedSort: String,
+    pushedLimit: Int)
     extends PartitionReaderFactory {
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
     val query = QueryCompiler(schema).compile(pushedPredicates)
@@ -23,6 +25,8 @@ class SnapshotPartitionReaderFactory(
       snapshotParams,
       schema,
       partition.asInstanceOf[SnapshotInputPartition],
-      query)
+      query,
+      pushedSort,
+      pushedLimit)
   }
 }

@@ -15,12 +15,20 @@ class SnapshotScan(
     schema: StructType,
     snapshotParams: SnapshotParams,
     snapshotTableMetadata: SnapshotTableMetadata,
-    pushedPredicates: Array[Predicate])
+    pushedPredicates: Array[Predicate],
+    pushedSort: String,
+    pushedLimit: Int)
     extends Scan {
   override def readSchema(): StructType = schema
 
   override def description(): String = snapshotParams.getSnapshotName
 
   override def toBatch: Batch =
-    new SnapshotBatch(schema, snapshotParams, snapshotTableMetadata, pushedPredicates)
+    new SnapshotBatch(
+      schema,
+      snapshotParams,
+      snapshotTableMetadata,
+      pushedPredicates,
+      pushedSort,
+      pushedLimit)
 }

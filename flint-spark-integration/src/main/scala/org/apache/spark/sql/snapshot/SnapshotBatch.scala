@@ -18,7 +18,9 @@ class SnapshotBatch(
     val schema: StructType,
     val snapshotParams: SnapshotParams,
     val snapshotTableMetadata: SnapshotTableMetadata,
-    pushedPredicates: Array[Predicate])
+    pushedPredicates: Array[Predicate],
+    pushedSort: String,
+    pushedLimit: Int)
     extends Batch {
 
   override def planInputPartitions(): Array[InputPartition] = {
@@ -36,6 +38,11 @@ class SnapshotBatch(
   }
 
   override def createReaderFactory(): PartitionReaderFactory = {
-    new SnapshotPartitionReaderFactory(schema, snapshotParams, pushedPredicates)
+    new SnapshotPartitionReaderFactory(
+      schema,
+      snapshotParams,
+      pushedPredicates,
+      pushedSort,
+      pushedLimit)
   }
 }
