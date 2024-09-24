@@ -17,7 +17,8 @@ class SnapshotPartitionReaderFactory(
     snapshotParams: SnapshotParams,
     pushedPredicates: Array[Predicate],
     pushedSort: String,
-    pushedLimit: Int)
+    pushedLimit: Int,
+    requiredSchema: StructType)
     extends PartitionReaderFactory {
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
     val query = QueryCompiler(schema).compile(pushedPredicates)
@@ -27,6 +28,7 @@ class SnapshotPartitionReaderFactory(
       partition.asInstanceOf[SnapshotInputPartition],
       query,
       pushedSort,
-      pushedLimit)
+      pushedLimit,
+      requiredSchema)
   }
 }

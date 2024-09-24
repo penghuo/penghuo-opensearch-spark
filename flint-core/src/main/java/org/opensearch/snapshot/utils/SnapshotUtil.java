@@ -344,12 +344,11 @@ public class SnapshotUtil {
 
   private static TransferManager createTransferManager(BlobContainer shardContainer) {
     final FileCache remoteStoreFileCache = FileCacheFactory.createConcurrentLRUFileCache(
-        10*1024,
+        20 * 1024 * 1024 * 1024L,
         1,
         new NoopCircuitBreaker(CircuitBreaker.REQUEST)
     );
     return new TransferManager(shardContainer, remoteStoreFileCache);
   }
-
 
 }

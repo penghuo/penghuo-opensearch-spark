@@ -17,9 +17,10 @@ class SnapshotScan(
     snapshotTableMetadata: SnapshotTableMetadata,
     pushedPredicates: Array[Predicate],
     pushedSort: String,
-    pushedLimit: Int)
+    pushedLimit: Int,
+    requiredSchema: StructType)
     extends Scan {
-  override def readSchema(): StructType = schema
+  override def readSchema(): StructType = requiredSchema
 
   override def description(): String = snapshotParams.getSnapshotName
 
@@ -30,5 +31,6 @@ class SnapshotScan(
       snapshotTableMetadata,
       pushedPredicates,
       pushedSort,
-      pushedLimit)
+      pushedLimit,
+      requiredSchema: StructType)
 }

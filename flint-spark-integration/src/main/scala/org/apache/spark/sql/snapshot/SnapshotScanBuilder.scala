@@ -5,13 +5,12 @@
 
 package org.apache.spark.sql.snapshot
 
-import org.apache.lucene.search.MatchAllDocsQuery
 import org.opensearch.flint.spark.skipping.bloomfilter.BloomFilterMightContain
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotTableMetadata}
 
 import org.apache.spark.sql.connector.expressions.{NamedReference, SortOrder}
 import org.apache.spark.sql.connector.expressions.filter.Predicate
-import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownTopN, SupportsPushDownV2Filters}
+import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownRequiredColumns, SupportsPushDownTopN, SupportsPushDownV2Filters}
 import org.apache.spark.sql.types.StructType
 
 class SnapshotScanBuilder(
@@ -20,11 +19,13 @@ class SnapshotScanBuilder(
     snapshotTableMetadata: SnapshotTableMetadata)
     extends ScanBuilder
     with SupportsPushDownV2Filters
-    with SupportsPushDownTopN {
+    with SupportsPushDownTopN
+    with SupportsPushDownRequiredColumns {
 
   private var pushedPredicate = Array.empty[Predicate]
   private var pushedSort: String = ""
   private var pushedLimit = 100
+  private var requiredSchema: StructType = null
 
   override def build(): Scan =
     new SnapshotScan(
@@ -33,7 +34,8 @@ class SnapshotScanBuilder(
       snapshotTableMetadata,
       pushedPredicate,
       pushedSort,
-      pushedLimit)
+      pushedLimit,
+      requiredSchema)
 
   override def pushPredicates(predicates: Array[Predicate]): Array[Predicate] = {
     val (pushed, unSupported) =
@@ -42,7 +44,10 @@ class SnapshotScanBuilder(
         !q.toString.equalsIgnoreCase("*:*")
       })
     pushedPredicate = pushed
-    unSupported
+
+    // FIXME, assume we can pushdown everything
+//    unSupported
+    Array.empty[Predicate]
   }
 
   override def pushedPredicates(): Array[Predicate] = pushedPredicate
@@ -58,5 +63,9 @@ class SnapshotScanBuilder(
       case _ => None
     }
     true
+  }
+
+  override def pruneColumns(requiredSchema: StructType): Unit = {
+    this.requiredSchema = requiredSchema
   }
 }

@@ -20,7 +20,8 @@ class SnapshotBatch(
     val snapshotTableMetadata: SnapshotTableMetadata,
     pushedPredicates: Array[Predicate],
     pushedSort: String,
-    pushedLimit: Int)
+    pushedLimit: Int,
+    requiredSchema: StructType)
     extends Batch {
 
   override def planInputPartitions(): Array[InputPartition] = {
@@ -43,6 +44,7 @@ class SnapshotBatch(
       snapshotParams,
       pushedPredicates,
       pushedSort,
-      pushedLimit)
+      pushedLimit,
+      requiredSchema: StructType)
   }
 }
