@@ -18,7 +18,8 @@ class SnapshotScan(
     pushedPredicates: Array[Predicate],
     pushedSort: String,
     pushedLimit: Int,
-    requiredSchema: StructType)
+    requiredSchema: StructType,
+    hasAggregations: Boolean)
     extends Scan {
   override def readSchema(): StructType = requiredSchema
 
@@ -32,5 +33,6 @@ class SnapshotScan(
       pushedPredicates,
       pushedSort,
       pushedLimit,
-      requiredSchema: StructType)
+      requiredSchema,
+      hasAggregations)
 }

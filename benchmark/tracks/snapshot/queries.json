@@ -1,0 +1,9 @@
+[
+    {"id": "q1", "query": "SELECT * FROM `s3snapshot`.`default`.`quickwit-generated-logs-v1_001` WHERE message = 'queen' ORDER BY timestamp DESC limit 100;"},
+    {"id": "q2", "query": "SELECT * FROM `s3snapshot`.`default`.`quickwit-generated-logs-v1_001` WHERE cloud.region = 'us-east-2' ORDER BY timestamp DESC limit 100;"},
+    {"id": "q3", "query": "SELECT * FROM `s3snapshot`.`default`.`quickwit-generated-logs-v1_001` WHERE message = 'queen' and cloud.region = 'us-east-2'  ORDER BY timestamp DESC limit 100;"},
+    {"id": "q4", "query": "SELECT window(`timestamp`, '2 hours').start as time_window, level, COUNT(*) as cnt FROM `s3snapshot`.`default`.`quickwit-generated-logs-v1_001` GROUP BY window(`timestamp`, '2 hours').start, level;"},
+    {"id": "q5", "query": "SELECT window(`timestamp`, '2 hours').start as time_window, level, COUNT(*) as cnt FROM `s3snapshot`.`default`.`quickwit-generated-logs-v1_001` WHERE message = 'queen' GROUP BY window(`timestamp`, '2 hours').start, level;"},
+    {"id": "q6", "query": "SELECT window(`timestamp`, '2 hours').start as time_window, level, COUNT(*) as cnt FROM `s3snapshot`.`default`.`quickwit-generated-logs-v1_001` WHERE cloud.region = 'us-east-2' GROUP BY window(`timestamp`, '2 hours').start, level;"},
+    {"id": "q7", "query": "SELECT window(`timestamp`, '2 hours').start as time_window, level, COUNT(*) as cnt FROM `s3snapshot`.`default`.`quickwit-generated-logs-v1_001` WHERE message = 'queen' and cloud.region = 'us-east-2' GROUP BY window(`timestamp`, '2 hours').start, level;"}
+]

@@ -21,7 +21,8 @@ class SnapshotBatch(
     pushedPredicates: Array[Predicate],
     pushedSort: String,
     pushedLimit: Int,
-    requiredSchema: StructType)
+    requiredSchema: StructType,
+    hasAggregations: Boolean)
     extends Batch {
 
   override def planInputPartitions(): Array[InputPartition] = {
@@ -45,6 +46,7 @@ class SnapshotBatch(
       pushedPredicates,
       pushedSort,
       pushedLimit,
-      requiredSchema: StructType)
+      requiredSchema: StructType,
+      hasAggregations)
   }
 }

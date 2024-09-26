@@ -9,8 +9,9 @@ import org.opensearch.flint.spark.skipping.bloomfilter.BloomFilterMightContain
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotTableMetadata}
 
 import org.apache.spark.sql.connector.expressions.{NamedReference, SortOrder}
+import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.expressions.filter.Predicate
-import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownRequiredColumns, SupportsPushDownTopN, SupportsPushDownV2Filters}
+import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownAggregates, SupportsPushDownRequiredColumns, SupportsPushDownTopN, SupportsPushDownV2Filters}
 import org.apache.spark.sql.types.StructType
 
 class SnapshotScanBuilder(
@@ -20,12 +21,14 @@ class SnapshotScanBuilder(
     extends ScanBuilder
     with SupportsPushDownV2Filters
     with SupportsPushDownTopN
-    with SupportsPushDownRequiredColumns {
+    with SupportsPushDownRequiredColumns
+    with SupportsPushDownAggregates {
 
   private var pushedPredicate = Array.empty[Predicate]
   private var pushedSort: String = ""
   private var pushedLimit = 100
   private var requiredSchema: StructType = null
+  private var hasAggregations = false
 
   override def build(): Scan =
     new SnapshotScan(
@@ -35,7 +38,8 @@ class SnapshotScanBuilder(
       pushedPredicate,
       pushedSort,
       pushedLimit,
-      requiredSchema)
+      requiredSchema,
+      hasAggregations)
 
   override def pushPredicates(predicates: Array[Predicate]): Array[Predicate] = {
     val (pushed, unSupported) =
@@ -67,5 +71,10 @@ class SnapshotScanBuilder(
 
   override def pruneColumns(requiredSchema: StructType): Unit = {
     this.requiredSchema = requiredSchema
+  }
+
+  override def pushAggregation(aggregation: Aggregation): Boolean = {
+    hasAggregations = true
+    false
   }
 }

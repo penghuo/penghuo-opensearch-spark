@@ -6,18 +6,19 @@
 package org.apache.spark.sql.snapshot
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.{BigIntVector, ValueVector, VarCharVector}
 import org.apache.lucene.index._
-import org.apache.lucene.search.{IndexSearcher, Query}
+import org.apache.lucene.search.{Collector, IndexSearcher, LeafCollector, MatchAllDocsQuery, Query, Scorable, ScoreMode}
 import org.apache.lucene.util.BytesRef
 import org.opensearch.snapshot.utils.{SnapshotParams, SnapshotUtil}
 
 import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.connector.read.PartitionReader
-import org.apache.spark.sql.snapshot.SnapshotPartitionColumnReader.{DocValueData, LongDocValueData, StringDocValueData}
+import org.apache.spark.sql.snapshot.SnapshotPartitionColumnReader.{DocValueData, LongDocValueData, MatchAllIterator, SearchIterator, StringDocValueData}
 import org.apache.spark.sql.types.{DataTypes, StructType}
 import org.apache.spark.sql.vectorized.{ArrowColumnVector, ColumnarBatch, ColumnVector}
 
@@ -39,20 +40,16 @@ class SnapshotPartitionColumnReader(
   private val docValues: Array[DocValueData] = new Array[DocValueData](requiredSchema.size)
 
   private var taskId = -1L
-  private var init = false
 
-  var docId = 0
-  var maxDoc: Int = -1
-
-  private val allocator1 = new RootAllocator(Long.MaxValue)
-  private val allocator2 = new RootAllocator(Long.MaxValue)
+  private val allocator = new RootAllocator(Long.MaxValue)
+//  private val allocator2 = new RootAllocator(Long.MaxValue)
   private val arrowVectors = new Array[ArrowColumnVector](requiredSchema.size)
 
   private var currentBatchSize = 0
+  private var docIds: Iterator[Int] = null
 
   override def next(): Boolean = {
     if (indexSearcher == null) {
-      init = true
       taskId = TaskContext.get.taskAttemptId()
 
       val startTime = System.currentTimeMillis()
@@ -72,7 +69,7 @@ class SnapshotPartitionColumnReader(
       var i = 0
       for (field <- requiredSchema.fields) {
         if (field.dataType == DataTypes.StringType) {
-          val vector = new VarCharVector(field.name, allocator1)
+          val vector = new VarCharVector(field.name, allocator)
           vector.allocateNew(batchSize * 5, batchSize)
           vector.allocateNew()
           docValues.update(
@@ -82,7 +79,7 @@ class SnapshotPartitionColumnReader(
               vector))
           arrowVectors(i) = new ArrowColumnVector(vector)
         } else {
-          val vector = new BigIntVector(field.name, allocator2)
+          val vector = new BigIntVector(field.name, allocator)
           vector.allocateNew(batchSize)
           docValues.update(
             i,
@@ -94,22 +91,43 @@ class SnapshotPartitionColumnReader(
         i += 1
       }
 
-      maxDoc = indexReader.maxDoc()
-      logInfo(s"TID-$taskId, Shard-${snapshotInputPartition.shardId} max doc: $maxDoc")
-    }
+      if (query.equals(new MatchAllDocsQuery)) {
+        val maxDoc = indexReader.maxDoc()
+        logInfo(s"TID-$taskId, Shard-${snapshotInputPartition.shardId} max doc: $maxDoc")
+        docIds = MatchAllIterator(maxDoc)
+      } else {
+        val internalDocIds = SearchIterator()
+        indexSearcher.search(
+          query,
+          new Collector {
+            override def getLeafCollector(context: LeafReaderContext): LeafCollector =
+              new LeafCollector {
+                override def setScorer(scorer: Scorable): Unit = {}
 
-    docId < maxDoc
+                override def collect(doc: Int): Unit = {
+                  internalDocIds.add(doc)
+                }
+              }
+            override def scoreMode(): ScoreMode = ScoreMode.COMPLETE_NO_SCORES
+          })
+        docIds = internalDocIds
+        logInfo(
+          s"TID-$taskId, Shard-${snapshotInputPartition.shardId} total hits: ${internalDocIds.total()}")
+      }
+
+    }
+    docIds.hasNext
   }
 
   override def get(): ColumnarBatch = {
     resetVectors()
 
     currentBatchSize = 0
-    while (currentBatchSize < batchSize && docId < maxDoc) {
+    while (currentBatchSize < batchSize && docIds.hasNext) {
+      val docId = docIds.next()
       for (docValue <- docValues) {
         docValue.row(docId, currentBatchSize)
       }
-      docId += 1
       currentBatchSize += 1
     }
     logInfo(s"TID-$taskId, Shard-${snapshotInputPartition.shardId} batch size: $currentBatchSize")
@@ -135,8 +153,7 @@ class SnapshotPartitionColumnReader(
     arrowVectors.foreach { vector =>
       if (vector != null) vector.close()
     }
-    allocator1.close()
-    allocator2.close()
+    allocator.close()
   }
 }
 
@@ -175,6 +192,42 @@ object SnapshotPartitionColumnReader extends Logging {
           cache(ord) = termCopy
           termCopy
       }
+    }
+  }
+
+  case class MatchAllIterator(maxDoc: Int) extends Iterator[Int] {
+    var docId = 0
+
+    override def hasNext: Boolean = {
+      docId < maxDoc
+    }
+
+    override def next(): Int = {
+      val temp = docId
+      docId += 1
+      temp
+    }
+  }
+
+  case class SearchIterator() extends Iterator[Int] {
+    var buffer = ArrayBuffer.empty[Int]
+    var iter: Iterator[Int] = null
+
+    def total(): Int = buffer.length
+
+    def add(docId: Int): Unit = {
+      buffer.append(docId)
+    }
+
+    override def hasNext: Boolean = {
+      if (iter == null) {
+        iter = buffer.iterator
+      }
+      iter.hasNext
+    }
+
+    override def next(): Int = {
+      iter.next()
     }
   }
 }

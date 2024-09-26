@@ -19,7 +19,8 @@ class SnapshotPartitionReaderFactory(
     pushedPredicates: Array[Predicate],
     pushedSort: String,
     pushedLimit: Int,
-    requiredSchema: StructType)
+    requiredSchema: StructType,
+    hasAggregation: Boolean)
     extends PartitionReaderFactory {
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
     val query = QueryCompiler(schema).compile(pushedPredicates)
@@ -45,5 +46,12 @@ class SnapshotPartitionReaderFactory(
       requiredSchema)
   }
 
-  override def supportColumnarReads(partition: InputPartition): Boolean = true
+  override def supportColumnarReads(partition: InputPartition): Boolean = {
+    // FIXME
+    if (pushedSort.isBlank || pushedSort.isEmpty) {
+      true
+    } else {
+      false
+    }
+  }
 }
