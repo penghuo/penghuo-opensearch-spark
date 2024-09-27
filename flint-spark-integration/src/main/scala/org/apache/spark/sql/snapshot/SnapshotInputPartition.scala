@@ -11,5 +11,6 @@ case class SnapshotInputPartition(
     val snapshotUUID: String,
     val indexId: String,
     val indexName: String,
-    val shardId: String)
-    extends InputPartition
+    val shardId: String,
+    override val preferredLocations: Array[String])
+    extends InputPartition {}
