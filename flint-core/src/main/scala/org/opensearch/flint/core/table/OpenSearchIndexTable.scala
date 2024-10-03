@@ -15,6 +15,7 @@ import org.opensearch.client.opensearch.indices.stats.IndicesStats
 import org.opensearch.flint.core._
 import org.opensearch.flint.core.storage.{FlintReader, OpenSearchClientUtils, OpenSearchSearchAfterQueryReader}
 import org.opensearch.flint.core.table.OpenSearchIndexTable.maxSplitSizeBytes
+import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 
@@ -57,7 +58,8 @@ class OpenSearchIndexTable(metaData: MetaData, option: FlintOptions) extends Tab
       } else {
         val totalSizeBytes = indexStats.primaries().store().sizeInBytes
         val docSize = Math.ceil(totalSizeBytes / docCount).toLong
-        Math.max(Math.min(maxSplitSizeBytes / docSize, maxResultWindow), 1).toInt
+//        Math.max(Math.min(maxSplitSizeBytes / docSize, maxResultWindow), 1).toInt
+        1
       }
     }
   }
@@ -99,7 +101,9 @@ class OpenSearchIndexTable(metaData: MetaData, option: FlintOptions) extends Tab
    * @return
    *   A FlintReader instance.
    */
-  override def createReader(query: String): FlintReader = {
+  override def createReader(
+      query: String,
+      aggregation: Option[CompositeAggregationBuilder] = None): FlintReader = {
     new OpenSearchSearchAfterQueryReader(
       OpenSearchClientUtils.createClient(option),
       new SearchRequest()

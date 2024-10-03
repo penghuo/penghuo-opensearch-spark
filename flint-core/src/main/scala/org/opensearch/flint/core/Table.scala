@@ -16,6 +16,7 @@ import org.opensearch.flint.core.storage.FlintReader
 import org.opensearch.index.query.{AbstractQueryBuilder, MatchAllQueryBuilder, QueryBuilder}
 import org.opensearch.plugins.SearchPlugin
 import org.opensearch.search.SearchModule
+import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 
 /**
  * A OpenSearch Table.
@@ -52,7 +53,9 @@ trait Table extends Serializable {
    *   OpenSearch DSL query.
    * @return
    */
-  def createReader(query: String): FlintReader
+  def createReader(
+      query: String,
+      aggregation: Option[CompositeAggregationBuilder] = None): FlintReader
 
   /**
    * OpenSearch Table schema

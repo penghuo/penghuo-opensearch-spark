@@ -26,11 +26,17 @@ class OpenSearchTableITSuite extends OpenSearchCatalogSuite {
                      |    }
                      |  }
                      |}""".stripMargin
-    val docs = Seq("""{
+    val docs = Seq(
+      """{
                      |  "accountId": "123",
                      |  "eventName": "event",
                      |  "eventSource": "source"
-                     |}""".stripMargin)
+                     |}""".stripMargin,
+      """{
+        |  "accountId": "456",
+        |  "eventName": "event",
+        |  "eventSource": "source"
+        |}""".stripMargin)
     index(indexName, twoShards, mappings, docs)
   }
 
@@ -59,6 +65,18 @@ class OpenSearchTableITSuite extends OpenSearchCatalogSuite {
 
         assert(df.rdd.getNumPartitions == 2)
       }
+    }
+  }
+
+  test("Aggregation") {
+    val indexName1 = "t0001"
+    withIndexName(indexName1) {
+      multipleShardsIndex(indexName1)
+      val df = spark.sql(s"""
+        SELECT accountId, count(*)
+        FROM ${catalogName}.default.`t0001` GROUP BY accountId""")
+
+      df.show()
     }
   }
 }

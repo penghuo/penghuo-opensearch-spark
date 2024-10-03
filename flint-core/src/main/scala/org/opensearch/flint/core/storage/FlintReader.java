@@ -24,4 +24,8 @@ public interface FlintReader {
    * close.
    */
   void close();
+
+  default OpenSearchQueryReader queryReader() {
+    throw new UnsupportedOperationException();
+  }
 }

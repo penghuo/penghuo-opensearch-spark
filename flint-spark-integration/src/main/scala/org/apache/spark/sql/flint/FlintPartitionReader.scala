@@ -6,7 +6,9 @@
 package org.apache.spark.sql.flint
 
 import com.fasterxml.jackson.core.{JsonFactory, JsonParser}
-import org.opensearch.flint.core.storage.FlintReader
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.opensearch.flint.core.storage.{FlintReader, OpenSearchQueryReader}
+import org.opensearch.flint.core.storage.parser.CompositeAggregationParser
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.json.{CreateJacksonParser, JSONOptionsInRead}
@@ -25,7 +27,12 @@ import org.apache.spark.unsafe.types.UTF8String
  * @param schema
  *   schema
  */
-class FlintPartitionReader(reader: FlintReader, schema: StructType, options: FlintSparkConf)
+class FlintPartitionReader(
+    reader: FlintReader,
+    schema: StructType,
+    options: FlintSparkConf,
+    aggregator: OpenSearchQueryReader,
+    hasAggregation: Boolean)
     extends PartitionReader[InternalRow] {
 
   lazy val parser = new FlintJacksonParser(
@@ -40,20 +47,36 @@ class FlintPartitionReader(reader: FlintReader, schema: StructType, options: Fli
     schema,
     parser.options.columnNameOfCorruptRecord)
 
-  var rows: Iterator[InternalRow] = Iterator.empty
+  var rows: Iterator[InternalRow] = null
+
+  val mapper = new ObjectMapper()
 
   /**
    * Todo. consider multiple-line json.
    * @return
    */
   override def next: Boolean = {
-    if (rows.hasNext) {
-      true
-    } else if (reader.hasNext) {
-      rows = safeParser.parse(reader.next())
+    if (hasAggregation) {
+      if (rows == null) {
+        val resp = aggregator.searchAgg()
+        if (resp.isEmpty) {
+          return false
+        } else {
+          val maps =
+            new CompositeAggregationParser().parse(aggregator.searchAgg().get().getAggregations)
+          rows = safeParser.parse(mapper.writeValueAsString(maps))
+        }
+      }
       rows.hasNext
     } else {
-      false
+      if (rows.hasNext) {
+        true
+      } else if (reader.hasNext) {
+        rows = safeParser.parse(reader.next())
+        rows.hasNext
+      } else {
+        false
+      }
     }
   }
 

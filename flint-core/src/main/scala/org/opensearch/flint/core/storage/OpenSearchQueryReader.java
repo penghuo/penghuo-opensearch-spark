@@ -28,6 +28,19 @@ public class OpenSearchQueryReader extends OpenSearchReader {
     super(client, new SearchRequest().indices(indexName).source(searchSourceBuilder));
   }
 
+  public OpenSearchQueryReader(IRestHighLevelClient client, SearchRequest searchRequest) {
+    super(client, searchRequest);
+  }
+
+  public Optional<SearchResponse> searchAgg() {
+    Optional<SearchResponse> response = Optional.empty();
+    try {
+      response = Optional.of(client.search(super.searchRequest, RequestOptions.DEFAULT));
+    } catch (Exception e) {
+    }
+    return response;
+  }
+
   /**
    * search.
    */

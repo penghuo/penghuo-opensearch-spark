@@ -214,8 +214,7 @@ lazy val flintSparkIntegration = (project in file("flint-spark-integration"))
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
-    },
-    assembly / test := (Test / test).value)
+    })
 
 lazy val IntegrationTest = config("it") extend Test
 lazy val AwsIntegrationTest = config("aws-it") extend Test

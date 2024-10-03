@@ -5,11 +5,19 @@
 
 package org.apache.spark.sql.flint.storage
 
+import scala.collection.JavaConverters
+import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
+
+import org.opensearch.search.aggregations.{AggregationBuilder, AggregationBuilders, AggregatorFactories}
+import org.opensearch.search.aggregations.bucket.composite.{CompositeAggregationBuilder, CompositeValuesSourceBuilder, TermsValuesSourceBuilder}
+import org.opensearch.search.aggregations.bucket.missing.MissingOrder
+import org.opensearch.search.sort.SortOrder
 
 import org.apache.spark.sql.catalyst.expressions.Literal
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, TimestampFormatter}
 import org.apache.spark.sql.connector.expressions.{Expression, FieldReference, LiteralValue}
+import org.apache.spark.sql.connector.expressions.aggregate.{AggregateFunc, Aggregation, Count, CountStar}
 import org.apache.spark.sql.connector.expressions.filter.{And, Predicate}
 import org.apache.spark.sql.flint.datatype.FlintDataType.STRICT_DATE_OPTIONAL_TIME_FORMATTER_WITH_NANOS
 import org.apache.spark.sql.internal.SQLConf
@@ -29,6 +37,46 @@ case class FlintQueryCompiler(schema: StructType) {
       return ""
     }
     compile(predicates.reduce(new And(_, _)))
+  }
+
+  def compileAgg(aggregation: Aggregation): CompositeAggregationBuilder = {
+
+    val resultBuilder: ArrayBuffer[CompositeValuesSourceBuilder[_]] = ArrayBuffer()
+    aggregation
+      .groupByExpressions()
+      .map(compileGroupBy)
+      .foreach(builder => {
+        resultBuilder.append(builder)
+      })
+
+    val builder = new AggregatorFactories.Builder
+    aggregation.aggregateExpressions().map(compileMetric).foreach(_ => builder.addAggregator(_))
+
+    AggregationBuilders
+      .composite("composite_buckets", JavaConverters.bufferAsJavaList(resultBuilder))
+      .subAggregations(builder)
+  }
+
+  def compileGroupBy(expr: Expression): CompositeValuesSourceBuilder[_] = {
+    expr match {
+      case f: FieldReference =>
+        new TermsValuesSourceBuilder(f.toString())
+          .field(f.toString())
+          .missingBucket(true)
+          .missingOrder(MissingOrder.DEFAULT)
+          .order(SortOrder.ASC)
+      case _ => throw new UnsupportedOperationException(s"$expr")
+    }
+  }
+
+  def compileMetric(aggFunc: AggregateFunc): AggregationBuilder = {
+    aggFunc match {
+      case f: Count =>
+        AggregationBuilders.count(f.column().asInstanceOf[FieldReference].toString())
+      case _: CountStar =>
+        AggregationBuilders.count("_index")
+      case _ => throw new UnsupportedOperationException(s"$aggFunc")
+    }
   }
 
   /**

@@ -7,6 +7,7 @@ package org.apache.spark.sql.flint
 
 import org.opensearch.flint.spark.skipping.bloomfilter.BloomFilterMightContain
 
+import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReaderFactory, Scan}
 import org.apache.spark.sql.flint.config.FlintSparkConf
@@ -16,7 +17,8 @@ case class FlintScan(
     tables: Seq[org.opensearch.flint.core.Table],
     schema: StructType,
     options: FlintSparkConf,
-    pushedPredicates: Array[Predicate])
+    pushedPredicates: Array[Predicate],
+    pushedAggregate: Option[Aggregation])
     extends Scan
     with Batch {
 
@@ -35,7 +37,7 @@ case class FlintScan(
   }
 
   override def createReaderFactory(): PartitionReaderFactory = {
-    FlintPartitionReaderFactory(schema, options, pushedPredicates)
+    FlintPartitionReaderFactory(schema, options, pushedPredicates, pushedAggregate)
   }
 
   override def toBatch: Batch = this

@@ -73,4 +73,9 @@ public class OpenSearchSearchAfterQueryReader extends OpenSearchReader {
       return searchRequest -> searchRequest.preference(preference);
     }
   }
+
+  @Override
+  public OpenSearchQueryReader queryReader() {
+    return new OpenSearchQueryReader(client, super.searchRequest);
+  }
 }
