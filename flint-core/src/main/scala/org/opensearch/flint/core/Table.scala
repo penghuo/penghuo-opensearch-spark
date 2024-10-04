@@ -64,6 +64,8 @@ trait Table extends Serializable {
    *   {@link Schema}
    */
   def schema(): Schema
+
+  def prepare(): Boolean
 }
 
 object Table {

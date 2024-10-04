@@ -5,16 +5,26 @@
 
 package org.opensearch.flint.core.table
 
+import java.util
+import java.util.Map
+
 import org.json4s.{Formats, NoTypeHints}
 import org.json4s.JsonAST.JString
 import org.json4s.jackson.JsonMethods
 import org.json4s.native.Serialization
+import org.opensearch.action.admin.cluster.repositories.put.PutRepositoryRequest
+import org.opensearch.action.admin.cluster.snapshots.restore.{RestoreSnapshotRequest, RestoreSnapshotResponse}
 import org.opensearch.action.search.SearchRequest
-import org.opensearch.client.opensearch.indices.IndicesStatsRequest
+import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.client.RequestOptions
+import org.opensearch.client.indices.GetIndexRequest
+import org.opensearch.client.opensearch.indices.{IndicesStatsRequest, IndicesStatsResponse}
 import org.opensearch.client.opensearch.indices.stats.IndicesStats
+import org.opensearch.common.settings.Settings
 import org.opensearch.flint.core._
 import org.opensearch.flint.core.storage.{FlintReader, OpenSearchClientUtils, OpenSearchSearchAfterQueryReader}
 import org.opensearch.flint.core.table.OpenSearchIndexTable.maxSplitSizeBytes
+import org.opensearch.rest.RestStatus
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
@@ -58,8 +68,7 @@ class OpenSearchIndexTable(metaData: MetaData, option: FlintOptions) extends Tab
       } else {
         val totalSizeBytes = indexStats.primaries().store().sizeInBytes
         val docSize = Math.ceil(totalSizeBytes / docCount).toLong
-//        Math.max(Math.min(maxSplitSizeBytes / docSize, maxResultWindow), 1).toInt
-        1
+        Math.max(Math.min(maxSplitSizeBytes / docSize, maxResultWindow), 1).toInt
       }
     }
   }
@@ -139,6 +148,18 @@ class OpenSearchIndexTable(metaData: MetaData, option: FlintOptions) extends Tab
    *   true if splittable, otherwise false.
    */
   override def isSplittable(): Boolean = numberOfShards > 1
+
+  /**
+   * FIXME
+   *
+   * @return
+   */
+  override def prepare(): Boolean = {
+    OpenSearchClientUtils
+      .createClient(option)
+      .prepare(name)
+    true
+  }
 }
 
 object OpenSearchIndexTable {

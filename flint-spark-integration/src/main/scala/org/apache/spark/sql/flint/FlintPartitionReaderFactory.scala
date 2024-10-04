@@ -5,6 +5,7 @@
 
 package org.apache.spark.sql.flint
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.expressions.filter.Predicate
@@ -18,12 +19,15 @@ case class FlintPartitionReaderFactory(
     options: FlintSparkConf,
     pushedPredicates: Array[Predicate],
     pushedAggregate: Option[Aggregation])
-    extends PartitionReaderFactory {
+    extends PartitionReaderFactory
+    with Logging {
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
     val query = FlintQueryCompiler(schema).compile(pushedPredicates)
     val aggBuilder = pushedAggregate.map(agg => FlintQueryCompiler(schema).compileAgg(agg))
-
-    val reader = partition.asInstanceOf[OpenSearchSplit].table.createReader(query, aggBuilder)
+    val table = partition.asInstanceOf[OpenSearchSplit].table
+    logInfo(s"prepare table")
+    table.prepare()
+    val reader = table.createReader(query, aggBuilder)
     new FlintPartitionReader(
       reader,
       schema,

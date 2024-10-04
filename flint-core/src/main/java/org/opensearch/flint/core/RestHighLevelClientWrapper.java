@@ -5,6 +5,9 @@
 
 package org.opensearch.flint.core;
 
+import org.opensearch.action.admin.cluster.repositories.put.PutRepositoryRequest;
+import org.opensearch.action.admin.cluster.snapshots.restore.RestoreSnapshotRequest;
+import org.opensearch.action.admin.cluster.snapshots.restore.RestoreSnapshotResponse;
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
@@ -19,6 +22,7 @@ import org.opensearch.action.search.ClearScrollResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchScrollRequest;
+import org.opensearch.action.support.master.AcknowledgedResponse;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.client.RequestOptions;
@@ -35,10 +39,15 @@ import org.opensearch.client.opensearch.core.pit.CreatePitResponse;
 import org.opensearch.client.opensearch.indices.IndicesStatsRequest;
 import org.opensearch.client.opensearch.indices.IndicesStatsResponse;
 import org.opensearch.client.transport.rest_client.RestClientTransport;
-
-import java.io.IOException;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.flint.core.storage.BulkRequestRateLimiter;
 import org.opensearch.flint.core.storage.OpenSearchBulkRetryWrapper;
+import org.opensearch.flint.core.table.OpenSearchCluster;
+import org.opensearch.rest.RestStatus;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.logging.Logger;
 
 import static org.opensearch.flint.core.metrics.MetricConstants.OS_READ_OP_METRIC_PREFIX;
 import static org.opensearch.flint.core.metrics.MetricConstants.OS_WRITE_OP_METRIC_PREFIX;
@@ -48,6 +57,9 @@ import static org.opensearch.flint.core.metrics.MetricConstants.OS_WRITE_OP_METR
  * with integrated metrics tracking.
  */
 public class RestHighLevelClientWrapper implements IRestHighLevelClient {
+
+    private static final Logger LOG = Logger.getLogger(RestHighLevelClientWrapper.class.getName());
+
     private final RestHighLevelClient client;
     private final BulkRequestRateLimiter rateLimiter;
     private final OpenSearchBulkRetryWrapper bulkRetryWrapper;
@@ -151,6 +163,67 @@ public class RestHighLevelClientWrapper implements IRestHighLevelClient {
     @Override
     public CreatePitResponse createPit(CreatePitRequest request) throws IOException {
         return execute(OS_WRITE_OP_METRIC_PREFIX, () -> openSearchClient().createPit(request));
+    }
+
+    @Override
+    public AcknowledgedResponse createRepository(PutRepositoryRequest request) throws IOException {
+      return execute(OS_WRITE_OP_METRIC_PREFIX,
+          () -> client.snapshot().createRepository(request, RequestOptions.DEFAULT));
+    }
+
+    @Override
+    public RestoreSnapshotResponse restoreSnapshot(RestoreSnapshotRequest request) throws IOException {
+      return execute(OS_WRITE_OP_METRIC_PREFIX, () -> client.snapshot().restore(request, RequestOptions.DEFAULT));
+    }
+
+    @Override
+    public void prepare(String indexName) {
+      try {
+        if (doesIndexExist(new GetIndexRequest(indexName), RequestOptions.DEFAULT)) {
+          LOG.info("Index [" + indexName + "] already exists");
+        } else {
+          String repoName = "my-s3-repository";
+          String snapshotName = "s001";
+          String bucket = "flint-data-dp-us-west-2-beta";
+          String snapshotPath = "data/quickwit/generated-logs-v1/213_snapshot_001";
+
+          PutRepositoryRequest putRepositoryRequest = new PutRepositoryRequest(repoName);
+          putRepositoryRequest.type("s3");
+          putRepositoryRequest.settings(Settings.builder()
+              .put("base_path", snapshotPath)
+              .put("bucket", bucket)
+              .build());
+          AcknowledgedResponse createRepoResp = createRepository(putRepositoryRequest);
+          if (!createRepoResp.isAcknowledged()) {
+            LOG.severe("Failed to create repository");
+            throw new RuntimeException("Failed to create repository");
+          }
+          LOG.info("Created repository [" + repoName + "]");
+          RestoreSnapshotRequest
+              restoreSnapshotRequest =
+              new RestoreSnapshotRequest(repoName, snapshotName);
+          restoreSnapshotRequest.indices(indexName);
+          restoreSnapshotRequest.source(Map.of("storage_type", "remote_snapshot"));
+          RestoreSnapshotResponse
+              restoreSnapshotResponse =
+              restoreSnapshot(restoreSnapshotRequest);
+          if (restoreSnapshotResponse.status() != RestStatus.OK && restoreSnapshotResponse.status() != RestStatus.CREATED && restoreSnapshotResponse.status() != RestStatus.ACCEPTED) {
+            LOG.severe("Failed to restore snapshot " + restoreSnapshotResponse.status());
+            throw new RuntimeException("Failed to restore snapshot " + restoreSnapshotResponse.status());
+          }
+          LOG.info("Restored repository [" + repoName + "]" + "snapshot [" + snapshotName + "]");
+
+          IndicesStatsResponse stats = stats(new IndicesStatsRequest.Builder().index(indexName).build());
+          while (stats.shards().successful().intValue() != stats.shards().total().intValue()) {
+            LOG.info("wait..., successful:" + stats.shards().successful() + " total:" + stats.shards().total());
+            Thread.sleep(100);
+            stats = stats(new IndicesStatsRequest.Builder().index(indexName).build());
+          }
+        }
+      } catch (Exception e) {
+        LOG.severe(e.getMessage());
+        throw new RuntimeException(e);
+      }
     }
 
     /**

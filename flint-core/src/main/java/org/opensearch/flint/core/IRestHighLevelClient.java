@@ -7,6 +7,9 @@ package org.opensearch.flint.core;
 
 import org.opensearch.OpenSearchException;
 import org.opensearch.action.DocWriteResponse;
+import org.opensearch.action.admin.cluster.repositories.put.PutRepositoryRequest;
+import org.opensearch.action.admin.cluster.snapshots.restore.RestoreSnapshotRequest;
+import org.opensearch.action.admin.cluster.snapshots.restore.RestoreSnapshotResponse;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.delete.DeleteRequest;
@@ -20,6 +23,7 @@ import org.opensearch.action.search.ClearScrollResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.SearchScrollRequest;
+import org.opensearch.action.support.master.AcknowledgedResponse;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.client.RequestOptions;
 import org.opensearch.client.indices.CreateIndexRequest;
@@ -32,12 +36,18 @@ import org.opensearch.client.indices.PutMappingRequest;
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.opensearch.client.opensearch.indices.IndicesStatsRequest;
 import org.opensearch.client.opensearch.indices.IndicesStatsResponse;
+import org.opensearch.client.opensearch.snapshot.CreateRepositoryRequest;
+import org.opensearch.client.opensearch.snapshot.CreateRepositoryResponse;
+import org.opensearch.client.opensearch.snapshot.RestoreRequest;
+import org.opensearch.client.opensearch.snapshot.RestoreResponse;
 import org.opensearch.flint.core.logging.CustomLogging;
 import org.opensearch.flint.core.logging.OperationMessage;
 import org.opensearch.flint.core.metrics.MetricsUtil;
 
 import java.io.Closeable;
 import java.io.IOException;
+
+import static org.opensearch.flint.core.metrics.MetricConstants.OS_WRITE_OP_METRIC_PREFIX;
 
 /**
  * Interface for wrapping the OpenSearch High Level REST Client with additional functionality,
@@ -74,6 +84,12 @@ public interface IRestHighLevelClient extends Closeable {
     IndicesStatsResponse stats(IndicesStatsRequest request) throws IOException;
 
     CreatePitResponse createPit(CreatePitRequest request) throws IOException;
+
+    AcknowledgedResponse createRepository(PutRepositoryRequest request) throws IOException;
+
+    RestoreSnapshotResponse restoreSnapshot(RestoreSnapshotRequest request) throws IOException;
+
+    void prepare(String indexName);
 
     /**
      * Records the success of an OpenSearch operation by incrementing the corresponding metric counter.
