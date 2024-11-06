@@ -45,6 +45,7 @@ trait FlintSparkSuite extends QueryTest with FlintSuite with OpenSearchSuite wit
       .set(REFRESH_POLICY.key, "true")
       // Disable mandatory checkpoint for test convenience
       .set(CHECKPOINT_MANDATORY.key, "false")
+      .set("spark.sql.sources.useV1SourceList", "")
     conf
   }
 

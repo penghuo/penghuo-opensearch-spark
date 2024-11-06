@@ -26,7 +26,7 @@ import org.apache.spark.sql.flint.config.FlintSparkConf
 class FlintSparkMaterializedViewSqlITSuite extends FlintSparkSuite {
 
   /** Test table, MV, index name and query */
-  private val testTable = s"$catalogName.default.mv_test"
+  private val testTable = s"`$catalogName`.`default`.`mv_test`"
   private val testMvName = s"$catalogName.default.mv_test_metrics"
   private val testFlintIndex = getFlintIndexName(testMvName)
   private val testQuery =
@@ -136,12 +136,14 @@ class FlintSparkMaterializedViewSqlITSuite extends FlintSparkSuite {
              |   watermark_delay = '1 Second',
              |   output_mode = 'complete',
              |   index_settings = '{"number_of_shards": 3, "number_of_replicas": 2}',
-             |   extra_options = '{"$testTable": {"maxFilesPerTrigger": "1"}}'
+             |   extra_options = '{"$catalogName.default.mv_test": {"maxFilesPerTrigger": "1"}}'
              | )
              |""".stripMargin)
 
       val index = flint.describeIndex(testFlintIndex)
       index shouldBe defined
+
+
 
       val options = index.get.options
       options.autoRefresh() shouldBe true
@@ -149,7 +151,7 @@ class FlintSparkMaterializedViewSqlITSuite extends FlintSparkSuite {
       options.checkpointLocation() shouldBe Some(checkpointDir.getAbsolutePath)
       options.watermarkDelay() shouldBe Some("1 Second")
       options.outputMode() shouldBe Some("complete")
-      options.extraSourceOptions(testTable) shouldBe Map("maxFilesPerTrigger" -> "1")
+      options.extraSourceOptions(s"$catalogName.default.mv_test") shouldBe Map("maxFilesPerTrigger" -> "1")
       options.extraSinkOptions() shouldBe Map.empty
     }
   }

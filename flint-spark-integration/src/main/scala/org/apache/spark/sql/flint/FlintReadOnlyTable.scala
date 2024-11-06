@@ -52,7 +52,7 @@ class FlintReadOnlyTable(
   }
 
   override def capabilities(): util.Set[TableCapability] =
-    util.EnumSet.of(BATCH_READ)
+    util.EnumSet.of(BATCH_READ, TableCapability.MICRO_BATCH_READ)
 
   override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
     FlintScanBuilder(tables, schema, flintSparkConf)
