@@ -23,11 +23,13 @@ class FlintSparkPPLLookupITSuite
   /** Test table and index name */
   private val sourceTable = "spark_catalog.default.flint_ppl_test1"
   private val lookupTable = "spark_catalog.default.flint_ppl_test2"
+  private val lookupTbl = "spark_catalog.default.flint_ppl_test3"
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     createPeopleTable(sourceTable)
     createWorkInformationTable(lookupTable)
+    createWorkInformationTableDemo(lookupTbl)
   }
 
   protected override def afterEach(): Unit = {
@@ -47,6 +49,48 @@ class FlintSparkPPLLookupITSuite
   private def lookupAlias: LogicalPlan = {
     val tbl = UnresolvedRelation(Seq("spark_catalog", "default", "flint_ppl_test2"))
     SubqueryAlias("__auto_generated_subquery_name_l", tbl)
+  }
+
+  test("test LOOKUP lookupTable") {
+    var frame = sql(s"source = $sourceTable | LOOKUP $lookupTbl id")
+    frame.show()
+
+    frame = sql(s"source = $sourceTable | LOOKUP $lookupTbl id REPLACE id, department")
+    frame.show()
+  }
+
+  test("test LOOKUP lookupTable uid AS id") {
+    val frame = sql(s"source = $sourceTable| LOOKUP $lookupTable uid AS id REPLACE occupation")
+    frame.show()
+    // frame.explain(true)
+    val results: Array[Row] = frame.collect()
+    val expectedResults: Array[Row] = Array(
+      Row(1000, "Jake", "Engineer", "England", 100000, "IT"),
+      Row(1001, "Hello", "Artist", "USA", 70000, null),
+      Row(1002, "John", "Doctor", "Canada", 120000, "DATA"),
+      Row(1003, "David", "Doctor", null, 120000, "HR"),
+      Row(1004, "David", null, "Canada", 0, null),
+      Row(1005, "Jane", "Scientist", "Canada", 90000, "DATA"))
+
+    implicit val rowOrdering: Ordering[Row] = Ordering.by[Row, Integer](_.getAs[Integer](0))
+    assert(results.sorted.sameElements(expectedResults.sorted))
+  }
+
+  test("test LOOKUP lookupTable uid AS id REPLACE occupation") {
+    val frame = sql(s"source = $sourceTable| LOOKUP $lookupTable uid AS id REPLACE occupation")
+     frame.show()
+    // frame.explain(true)
+    val results: Array[Row] = frame.collect()
+    val expectedResults: Array[Row] = Array(
+      Row(1000, "Jake", "Engineer", "England", 100000, "IT"),
+      Row(1001, "Hello", "Artist", "USA", 70000, null),
+      Row(1002, "John", "Doctor", "Canada", 120000, "DATA"),
+      Row(1003, "David", "Doctor", null, 120000, "HR"),
+      Row(1004, "David", null, "Canada", 0, null),
+      Row(1005, "Jane", "Scientist", "Canada", 90000, "DATA"))
+
+    implicit val rowOrdering: Ordering[Row] = Ordering.by[Row, Integer](_.getAs[Integer](0))
+    assert(results.sorted.sameElements(expectedResults.sorted))
   }
 
   test("test LOOKUP lookupTable uid AS id REPLACE department") {
